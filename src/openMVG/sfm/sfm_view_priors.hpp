@@ -42,32 +42,33 @@ struct ViewPriors : public View
       height
     ),
     b_use_pose_center_(false),
-    b_use_pose_rotation_(false)
+    b_use_pose_rotation_(false),
+    b_fix_pose_(false)
   {
   }
 
   ~ViewPriors() override = default;
 
-  void SetPoseCenterPrior
-  (
-    const Vec3 & center,
-    const Vec3 & weight
-  )
-  {
-    b_use_pose_center_  = true;
-    center_weight_      = weight;
-    pose_center_        = center;
-  }
+//  void SetPoseCenterPrior
+//  (
+//    const Vec3 & center,
+//    const Vec3 & weight
+//  )
+//  {
+//    b_use_pose_center_  = true;
+//    center_weight_      = weight;
+//    pose_center_        = center;
+//  }
 
-  void SetPoseRotationPrior
-  (
-    const Mat3 & rotation,
-    const double weight
-  )
-  {
-    rotation_weight_ = weight;
-    pose_rotation_   = rotation;
-  }
+//  void SetPoseRotationPrior
+//  (
+//    const Mat3 & rotation,
+//    const double weight
+//  )
+//  {
+//    rotation_weight_ = weight;
+//    pose_rotation_   = rotation;
+//  }
 
   /**
   * Serialization out
@@ -79,9 +80,10 @@ struct ViewPriors : public View
     View::save(ar);
 
     // Pose center prior
-    if (b_use_pose_center_)
+    if (b_use_pose_center_ || b_fix_pose_)
     {
       ar( cereal::make_nvp( "use_pose_center_prior", b_use_pose_center_ ) );
+      ar( cereal::make_nvp( "fix_pose", b_fix_pose_ ) );
       const std::vector<double> vec_weights = { center_weight_( 0 ), center_weight_( 1 ), center_weight_( 2 ) };
       ar( cereal::make_nvp( "center_weight", vec_weights ) );
       const std::vector<double> vec = { pose_center_( 0 ), pose_center_( 1 ), pose_center_( 2 ) };
@@ -89,8 +91,7 @@ struct ViewPriors : public View
     }
 
     // Pose rotation prior
-    /*
-    if (b_use_pose_rotation_)
+    if (b_use_pose_rotation_ || b_fix_pose_)
     {
       ar( cereal::make_nvp( "use_pose_rotation_prior", b_use_pose_rotation_ ) );
       ar( cereal::make_nvp( "rotation_weight", rotation_weight_ ) );
@@ -102,7 +103,6 @@ struct ViewPriors : public View
       };
       ar( cereal::make_nvp( "rotation", mat ) );
     }
-    */
   }
 
   /**
@@ -118,6 +118,7 @@ struct ViewPriors : public View
     try
     {
       ar( cereal::make_nvp( "use_pose_center_prior", b_use_pose_center_ ) );
+      ar( cereal::make_nvp( "fix_pose", b_fix_pose_ ) );
       std::vector<double> vec( 3 );
       ar( cereal::make_nvp( "center_weight", vec ) );
       center_weight_ = Eigen::Map<const Vec3>( &vec[0] );
@@ -128,10 +129,10 @@ struct ViewPriors : public View
     {
       // if it fails just use a default settings
       b_use_pose_center_ = false;
+      b_fix_pose_ = false;
     }
 
     // Pose rotation prior
-    /*
     try
     {
       ar( cereal::make_nvp( "use_pose_rotation_prior", b_use_pose_rotation_ ) );
@@ -147,8 +148,8 @@ struct ViewPriors : public View
     {
       // if it fails just use a default settings
       b_use_pose_rotation_ = false;
+      b_fix_pose_ = false;
     }
-    */
   }
 
   // Pose center prior
@@ -160,6 +161,9 @@ struct ViewPriors : public View
   bool b_use_pose_rotation_ = false; // Tell if the rotation prior must be used
   double rotation_weight_ = 1.0;
   Mat3 pose_rotation_ = Mat3::Identity();
+
+  // fix pose
+  bool b_fix_pose_ = false;
 };
 
 } // namespace sfm

@@ -237,9 +237,29 @@ bool Bundle_Adjustment_Ceres::Adjust
   {
     const IndexT indexPose = pose_it.first;
 
-    const Pose3 & pose = pose_it.second;
-    const Mat3 R = pose.rotation();
-    const Vec3 t = pose.translation();
+//      const sfm::ViewPriors * prior = dynamic_cast<sfm::ViewPriors*>(view_it.second.get());
+    const sfm::ViewPriors * view_pose_prior = dynamic_cast<sfm::ViewPriors*>(sfm_data.views.at(indexPose).get());
+    bool b_fix_pose = false;
+    if (view_pose_prior != nullptr){
+        b_fix_pose = view_pose_prior->b_fix_pose_; // && view_pose_prior != nullptr && sfm_data.IsPoseAndIntrinsicDefined(view_pose_prior);
+      } else {
+        std::cout << "nullptr" << std::endl;
+      }
+
+    std::cout << "idPose: " << indexPose << " idView/pose: " /*<< view_pose_prior->id_view << "," << view_pose_prior->id_pose*/
+         << " b_fix_pose: " << b_fix_pose << std::endl;
+
+    Mat3 R;
+    Vec3 t;
+    if (b_fix_pose){
+        R = view_pose_prior->pose_rotation_;
+        t = -( R * view_pose_prior->pose_center_ );
+      } else {
+        const Pose3 & pose = pose_it.second;
+        R = pose.rotation();
+        t = pose.translation();
+      }
+
 
     double angleAxis[3];
     ceres::RotationMatrixToAngleAxis((const double*)R.data(), angleAxis);
@@ -248,9 +268,13 @@ bool Bundle_Adjustment_Ceres::Adjust
 
     double * parameter_block = &map_poses[indexPose][0];
     problem.AddParameterBlock(parameter_block, 6);
-    if (options.extrinsics_opt == Extrinsic_Parameter_Type::NONE)
+
+
+
+    if ((options.extrinsics_opt == Extrinsic_Parameter_Type::NONE) || b_fix_pose)
     {
       // set the whole parameter block as constant for best performance
+      std::cout << "set constant " << indexPose << std::endl;
       problem.SetParameterBlockConstant(parameter_block);
     }
     else  // Subset parametrization
