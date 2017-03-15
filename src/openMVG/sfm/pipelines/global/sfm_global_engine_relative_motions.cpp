@@ -460,9 +460,10 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 
   // Remove outliers (max_angle, residual error)
   const size_t pointcount_initial = sfm_data_.structure.size();
-  RemoveOutliers_PixelResidualError(sfm_data_, 4.0);
+  RemoveOutliers_PixelResidualError(sfm_data_, 4.0); //4.0rm
   const size_t pointcount_pixelresidual_filter = sfm_data_.structure.size();
-  RemoveOutliers_AngleError(sfm_data_, 2.0);
+  RemoveOutliers_AngleError(sfm_data_, 2.0); //reconstruction fails with 1.5
+//  std::cout << "3, 2.0" << std::endl;
   const size_t pointcount_angular_filter = sfm_data_.structure.size();
   std::cout << "Outlier removal (remaining #points):\n"
     << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"

@@ -102,7 +102,7 @@ Bundle_Adjustment_Ceres::BA_Ceres_options::BA_Ceres_options
 )
 : bVerbose_(bVerbose),
   nb_threads_(1),
-  parameter_tolerance_(1e-8), //~= numeric_limits<float>::epsilon()
+  parameter_tolerance_(1e-8), //~= numeric_limits<float>::epsilon() //tested, no influence on termination criterion of ceres
   bUse_loss_function_(true)
 {
   #ifdef OPENMVG_USE_OPENMP
@@ -111,7 +111,7 @@ Bundle_Adjustment_Ceres::BA_Ceres_options::BA_Ceres_options
   if (!bmultithreaded)
     nb_threads_ = 1;
 
-  bCeres_summary_ = false;
+  bCeres_summary_ = true;//false;rm
 
   // Default configuration use a DENSE representation
   linear_solver_type_ = ceres::DENSE_SCHUR;
@@ -438,7 +438,7 @@ bool Bundle_Adjustment_Ceres::Adjust
   // Configure a BA engine and run it
   //  Make Ceres automatically detect the bundle structure.
   ceres::Solver::Options ceres_config_options;
-  ceres_config_options.max_num_iterations = 500;
+  ceres_config_options.max_num_iterations = 3000; //500rm
   ceres_config_options.preconditioner_type = ceres_options_.preconditioner_type_;
   ceres_config_options.linear_solver_type = ceres_options_.linear_solver_type_;
   ceres_config_options.sparse_linear_algebra_library_type = ceres_options_.sparse_linear_algebra_library_type_;
@@ -446,7 +446,9 @@ bool Bundle_Adjustment_Ceres::Adjust
   ceres_config_options.logging_type = ceres::SILENT;
   ceres_config_options.num_threads = ceres_options_.nb_threads_;
   ceres_config_options.num_linear_solver_threads = ceres_options_.nb_threads_;
-  ceres_config_options.parameter_tolerance = ceres_options_.parameter_tolerance_;
+//  ceres_config_options.parameter_tolerance = ceres_options_.parameter_tolerance_;
+  ceres_config_options.parameter_tolerance = 1e-10;
+  ceres_config_options.function_tolerance = 1e-10;
 
   // Solve BA
   ceres::Solver::Summary summary;
