@@ -154,6 +154,71 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
   return true;
 }
 
+bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
+
+//  //-------------------
+//  // Keep only the largest biedge connected subgraph
+//  //-------------------
+//  {
+//    const Pair_Set pairs = matches_provider_->getPairs();
+//    const std::set<IndexT> set_remainingIds = graph::CleanGraph_KeepLargestBiEdge_Nodes<Pair_Set, IndexT>(pairs);
+//    if(set_remainingIds.empty())
+//    {
+//      std::cout << "Invalid input image graph for global SfM" << std::endl;
+//      return false;
+//    }
+//    KeepOnlyReferencedElement(set_remainingIds, matches_provider_->pairWise_matches_);
+//  }
+
+//  openMVG::rotation_averaging::RelativeRotations relatives_R;
+//  Compute_Relative_Rotations(relatives_R);
+
+//  Hash_Map<IndexT, Mat3> global_rotations;
+//  if (!Compute_Global_Rotations(relatives_R, global_rotations))
+//  {
+//    std::cerr << "GlobalSfM:: Rotation Averaging failure!" << std::endl;
+//    return false;
+//  }
+
+//  matching::PairWiseMatches  tripletWise_matches;
+//  if (!Compute_Global_Translations(global_rotations, tripletWise_matches))
+//  {
+//    std::cerr << "GlobalSfM:: Translation Averaging failure!" << std::endl;
+//    return false;
+//  }
+//  if (!Compute_Initial_Structure(tripletWise_matches))
+//  {
+//    std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
+//    return false;
+//  }
+  if (!Adjust())
+  {
+    std::cerr << "GlobalSfM:: Non-linear adjustment failure!" << std::endl;
+    return false;
+  }
+
+  //-- Export statistics about the SfM process
+  if (!sLogging_file_.empty())
+  {
+    using namespace htmlDocument;
+    std::ostringstream os;
+    os << "Structure from Motion statistics.";
+    html_doc_stream_->pushInfo("<hr>");
+    html_doc_stream_->pushInfo(htmlMarkup("h1",os.str()));
+
+    os.str("");
+    os << "-------------------------------" << "<br>"
+      << "-- View count: " << sfm_data_.GetViews().size() << "<br>"
+      << "-- Intrinsic count: " << sfm_data_.GetIntrinsics().size() << "<br>"
+      << "-- Pose count: " << sfm_data_.GetPoses().size() << "<br>"
+      << "-- Track count: "  << sfm_data_.GetLandmarks().size() << "<br>"
+      << "-------------------------------" << "<br>";
+    html_doc_stream_->pushInfo(os.str());
+  }
+
+  return true;
+}
+
 /// Compute from relative rotations the global rotations of the camera poses
 bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Global_Rotations
 (
@@ -396,6 +461,14 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
 // Adjust the scene (& remove outliers)
 bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 {
+  // save raw input data
+  if (!sLogging_file_.empty())
+  {
+    Save(sfm_data_,
+      stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "input_raw", "ply"),
+      ESfM_Data(EXTRINSICS | STRUCTURE));
+  }
+
   // Refine sfm_scene (in a 3 iteration process (free the parameters regarding their incertainty order)):
 
   Bundle_Adjustment_Ceres bundle_adjustment_obj;

@@ -39,6 +39,8 @@ public:
 
   virtual bool Process();
 
+  virtual bool Process_okvis();
+
 protected:
   /// Compute from relative rotations the global rotations of the camera poses
   bool Compute_Global_Rotations

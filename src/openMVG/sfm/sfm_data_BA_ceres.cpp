@@ -251,10 +251,13 @@ bool Bundle_Adjustment_Ceres::Adjust
 
     Mat3 R;
     Vec3 t;
-    if (b_fix_pose){
+    if (b_fix_pose){ //use data saved in prior
         R = view_pose_prior->pose_rotation_;
         t = -( R * view_pose_prior->pose_center_ );
       } else {
+        // use data calculated in steps before (rel Rot, glob Rot, transl.)
+        // in case data poses are given, it is overwritten by identical data
+        // TODO: check and improve
         const Pose3 & pose = pose_it.second;
         R = pose.rotation();
         t = pose.translation();
