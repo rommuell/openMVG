@@ -115,6 +115,7 @@ public:
         if (!regions_ptr->Load(featFile, descFile))
         {
           std::cerr << "Invalid regions files for the view: " << sImageName << std::endl;
+//          continue;
 #ifdef OPENMVG_USE_OPENMP
         #pragma omp critical
 #endif
