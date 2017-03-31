@@ -104,15 +104,19 @@ inline bool Save_PLY(
 
       if (b_structure)
       {
-        // Export structure points as White points
+        // Export structure points
         const Landmarks & landmarks = sfm_data.GetLandmarks();
         for ( const auto & iterLandmarks : landmarks )
         {
           stream
             << iterLandmarks.second.X(0) << ' '
             << iterLandmarks.second.X(1) << ' '
-            << iterLandmarks.second.X(2) << ' '
-            << "255 255 255\n";
+            << iterLandmarks.second.X(2) << ' ';
+          if(iterLandmarks.second.b_external){
+            stream << "0 0 255\n"; //blue if external
+          } else {
+            stream << "255 255 255\n"; //white if internal
+            }
         }
       }
 

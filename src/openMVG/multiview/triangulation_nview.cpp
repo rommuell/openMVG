@@ -107,6 +107,8 @@ namespace openMVG {
     const int nviews = int(views.size());
     assert(nviews>=2);
 
+    //cout << this->views[0].first << endl << this->views[0].second << endl;
+
     // Iterative weighted linear least squares
     Mat3 AtA;
     Vec3 Atb, X;

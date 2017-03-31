@@ -50,6 +50,7 @@ struct Landmark
 {
   Vec3 X;
   Observations obs;
+  bool b_external = false;
 
   // Serialization
   template <class Archive>
@@ -58,6 +59,7 @@ struct Landmark
     const std::vector<double> point = { X(0), X(1), X(2) };
     ar(cereal::make_nvp("X", point ));
     ar(cereal::make_nvp("observations", obs));
+    ar(cereal::make_nvp("b_external", b_external));
   }
 
   template <class Archive>
@@ -67,6 +69,7 @@ struct Landmark
     ar(cereal::make_nvp("X", point ));
     X = Eigen::Map<const Vec3>(&point[0]);
     ar(cereal::make_nvp("observations", obs));
+    ar(cereal::make_nvp("b_external", b_external));
   }
 };
 

@@ -81,6 +81,10 @@ const
           trianObj.add(
             cam->get_projective_equivalent(pose),
             cam->get_ud_pixel(itObs->second.x));
+          stringstream ss;
+          ss << "ud \n" << cam->get_ud_pixel(itObs->second.x) << "\n orig \n" << itObs->second.x << "\n";
+          std::string s = ss.str();
+          cout << s << endl;
         }
       }
       if (trianObj.size() < 2)

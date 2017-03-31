@@ -173,7 +173,7 @@ int main(int argc, char **argv)
     break;
     case 'e': case 'E':
       eGeometricModelToCompute = ESSENTIAL_MATRIX;
-      sGeometricMatchesFilename = "matches.e.bin";
+      sGeometricMatchesFilename = "matches.e.txt"; //TODO: change to .bin
     break;
     case 'h': case 'H':
       eGeometricModelToCompute = HOMOGRAPHY_MATRIX;
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
       //---------------------------------------
       //-- Export putative matches
       //---------------------------------------
-      if (!Save(map_PutativesMatches, std::string(sMatchesDirectory + "/matches.putative.bin")))
+      if (!Save(map_PutativesMatches, std::string(sMatchesDirectory + "/matches.putative.txt"))) //TODO: change to .bin
       {
         std::cerr
           << "Cannot save computed matches in: "

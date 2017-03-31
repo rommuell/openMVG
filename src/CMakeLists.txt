@@ -151,7 +151,7 @@ endif (OpenMVG_USE_OPENMP)
 # ==============================================================================
 if (OpenMVG_BUILD_COVERAGE AND CMAKE_COMPILER_IS_GNUCXX)
   message("OpenMVG_BUILD_COVERAGE enabled")
-  set(CMAKE_BUILD_TYPE "Debug")
+  set(CMAKE_BUILD_TYPE "Release")
   add_definitions(--coverage -fprofile-arcs -ftest-coverage)
   set(CMAKE_EXE_LINKER_FLAGS
     "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")

@@ -121,6 +121,18 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
     std::cerr << "GlobalSfM:: Translation Averaging failure!" << std::endl;
     return false;
   }
+
+  //rm
+  ofstream TwmFile(sfm_data_.s_root_path + "/tripletWiseMatches.txt");
+  for (auto it = tripletWise_matches.begin(); it != tripletWise_matches.end(); it++){
+      TwmFile << it->first.first << " " << it->first.second << std::endl;
+      TwmFile << it->second.size() << endl;
+      for (auto it2 = it->second.begin(); it2 != it->second.end(); it2++){
+          TwmFile << it2->i_ << " " << it2->j_ << std::endl;
+        }
+    }
+  TwmFile.close();
+
   if (!Compute_Initial_Structure(tripletWise_matches))
   {
     std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
@@ -156,10 +168,10 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
 
 bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 
-//  //-------------------
-//  // Keep only the largest biedge connected subgraph
-//  //-------------------
-//  {
+  //-------------------
+  // Keep only the largest biedge connected subgraph
+  //-------------------
+  {
 //    const Pair_Set pairs = matches_provider_->getPairs();
 //    const std::set<IndexT> set_remainingIds = graph::CleanGraph_KeepLargestBiEdge_Nodes<Pair_Set, IndexT>(pairs);
 //    if(set_remainingIds.empty())
@@ -168,7 +180,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //      return false;
 //    }
 //    KeepOnlyReferencedElement(set_remainingIds, matches_provider_->pairWise_matches_);
-//  }
+  }
 
 //  openMVG::rotation_averaging::RelativeRotations relatives_R;
 //  Compute_Relative_Rotations(relatives_R);
@@ -179,6 +191,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //    std::cerr << "GlobalSfM:: Rotation Averaging failure!" << std::endl;
 //    return false;
 //  }
+
 
 //  matching::PairWiseMatches  tripletWise_matches;
 //  if (!Compute_Global_Translations(global_rotations, tripletWise_matches))
@@ -191,6 +204,227 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //    std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
 //    return false;
 //  }
+
+  auto structure_okvis_bkp = sfm_data_.structure;
+  sfm_data_.structure.clear();
+
+  using namespace openMVG::matching;
+//  // pairwise matches container:
+//  PairWiseMatches map_Matches;
+
+//  // Fil the pairwise correspondeces or load a series of pairwise matches from a file
+//  PairedIndMatchImport("matches.f.txt", map_Matches);
+  const IntrinsicBase * cam = sfm_data_.GetIntrinsics().at(0).get();
+
+  //---------------------------------------
+  // Compute tracks from pairwise matches
+  //---------------------------------------
+  openMVG::tracks::TracksBuilder tracksBuilder;
+  tracks::STLMAPTracks map_tracks;  // The track container
+  tracksBuilder.Build(matches_provider_->pairWise_matches_); // Build: Efficient fusion of correspondences
+  tracksBuilder.Filter();           // Filter: Remove track that have conflict
+  tracksBuilder.ExportToSTL(map_tracks); // Build tracks with STL compliant type
+//  IndexT id_gen = 0;
+        // In order to visit all the tracks, follow this code:
+
+  if (false){
+    map_tracks.clear();
+//    map_tracks.emplace(make_pair(0, ))
+    }
+        for (tracks::STLMAPTracks::const_iterator iterT = map_tracks.begin();
+                iterT != map_tracks.end(); ++ iterT)
+        {
+
+                const tracks::submapTrack & track = iterT->second;
+                const IndexT trackId = iterT->first;
+
+                const Mat34 P1 = cam->get_projective_equivalent(sfm_data_.poses[track.begin()->first]);
+                const Mat34 P2 = cam->get_projective_equivalent(sfm_data_.poses[track.rbegin()->first]);
+                const Vec2 x1_ = features_provider_->feats_per_view[track.begin()->first][track.begin()->second].coords().cast<double>();
+                const Vec2 x2_ = features_provider_->feats_per_view[track.rbegin()->first][track.rbegin()->second].coords().cast<double>();
+                Landmark lm;
+                TriangulateDLT(P1, x1_, P2, x2_, &lm.X);
+//                lm.X.setZero();
+
+                Vec3 X;
+                if(track.size() == 3){
+                    tracks::submapTrack::const_iterator it = track.begin();
+                    const Mat34 P3 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
+                    const Vec2 x3_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
+
+                    it++;
+                    const Mat34 P4 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
+                    const Vec2 x4_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
+
+
+                    TriangulateDLT(P3, x3_, P4, x4_, &X);
+                    cout << "first-last" << endl << lm.X<< endl << endl;
+                    cout << "first-second" << endl << X << endl;
+                    cout << "angle: " << acos(lm.X.dot(X) / (lm.X.norm() * X.norm())) / M_PI * 180 << endl;
+                    cout << "distance ratio; " << lm.X.norm() / X.norm() << endl;
+                    cout << endl;
+                  }
+
+                  SfM_Data tiny_scene;
+
+                  tiny_scene.intrinsics.insert(*sfm_data_.GetIntrinsics().find(0));
+
+                //feed 2D observations into sfm_data_structure
+                for ( tracks::submapTrack::const_iterator iterTrack = track.begin();
+                  iterTrack != track.end(); ++iterTrack)
+                {
+                    tiny_scene.views.insert(*sfm_data_.GetViews().find(iterTrack->first));
+                    tiny_scene.poses[iterTrack->first] = sfm_data_.poses[iterTrack->first];
+
+                    Observation ob;
+                    ob.id_feat = iterTrack->second;
+                    ob.x = features_provider_->feats_per_view[iterTrack->first][iterTrack->second].coords().cast<double>();
+//                        const IndexT imageId = iterTrack->first;
+//                        const IndexT featId = iterTrack->second;
+                    lm.obs.emplace(make_pair(iterTrack->first, ob));
+//                    id_gen++;
+
+                        // Get the feature point
+                }
+                tiny_scene.structure.emplace(make_pair(trackId, lm));
+
+                Bundle_Adjustment_Ceres::BA_Ceres_options options(false, false);
+                options.linear_solver_type_ = ceres::DENSE_SCHUR;
+                Bundle_Adjustment_Ceres bundle_adjustment_obj(options);
+                const Optimize_Options ba_refine_options
+                  (Intrinsic_Parameter_Type::NONE, // -> Keep intrinsic constant
+                  Extrinsic_Parameter_Type::NONE, // adjust camera motion
+                  Structure_Parameter_Type::ADJUST_ALL);// adjust scene structure
+                if (bundle_adjustment_obj.Adjust(tiny_scene, ba_refine_options))
+                {
+                    if(tiny_scene.structure.begin()->second.X.norm() < 100){
+                        sfm_data_.structure.insert(tiny_scene.structure.begin(), tiny_scene.structure.end());
+                      }
+
+                  }
+        }
+
+//    SfM_Data_Structure_Computation_Blind structure_estimator(true);
+//    structure_estimator.triangulate(sfm_data_);
+
+// list by rm
+////////////////////////////////////////////////////////////////////////////////////
+// list by openMVG
+//{
+//    using namespace openMVG::tracks;
+//    openMVG::tracks::TracksBuilder tracksBuilder;
+////    tracks::STLMAPTracks map_selectedTracks;  // The track container
+//    tracksBuilder.Build(matches_provider_->pairWise_matches_); // Build: Efficient fusion of correspondences
+
+//    tracksBuilder.Filter(); //Filter(3);
+//    STLMAPTracks map_selectedTracks; // reconstructed track (visibility per 3D point)
+//    tracksBuilder.ExportToSTL(map_selectedTracks);
+
+//    // Fill sfm_data with the computed tracks (no 3D yet)
+//    Landmarks & structure = sfm_data_.structure;
+//    IndexT idx(0);
+//    for (STLMAPTracks::const_iterator itTracks = map_selectedTracks.begin();
+//      itTracks != map_selectedTracks.end();
+//      ++itTracks, ++idx)
+//    {
+//      const submapTrack & track = itTracks->second;
+//      structure[idx] = Landmark();
+//      Observations & obs = structure.at(idx).obs;
+//      for (submapTrack::const_iterator it = track.begin(); it != track.end(); ++it)
+//      {
+//        const size_t imaIndex = it->first;
+//        const size_t featIndex = it->second;
+//        const PointFeature & pt = features_provider_->feats_per_view.at(imaIndex)[featIndex];
+//        obs[imaIndex] = Observation(pt.coords().cast<double>(), featIndex);
+//      }
+//    }
+
+//    std::cout << std::endl << "Track stats" << std::endl;
+//    {
+//      std::ostringstream osTrack;
+//      //-- Display stats:
+//      //    - number of images
+//      //    - number of tracks
+//      std::set<size_t> set_imagesId;
+//      TracksUtilsMap::ImageIdInTracks(map_selectedTracks, set_imagesId);
+//      osTrack << "------------------" << "\n"
+//        << "-- Tracks Stats --" << "\n"
+//        << " Tracks number: " << tracksBuilder.NbTracks() << "\n"
+//        << " Images Id: " << "\n";
+//      std::copy(set_imagesId.begin(),
+//        set_imagesId.end(),
+//        std::ostream_iterator<size_t>(osTrack, ", "));
+//      osTrack << "\n------------------" << "\n";
+
+//      std::map<size_t, size_t> map_Occurence_TrackLength;
+//      TracksUtilsMap::TracksLength(map_selectedTracks, map_Occurence_TrackLength);
+//      osTrack << "TrackLength, Occurrence" << "\n";
+//      for (std::map<size_t, size_t>::const_iterator iter = map_Occurence_TrackLength.begin();
+//        iter != map_Occurence_TrackLength.end(); ++iter)  {
+//        osTrack << "\t" << iter->first << "\t" << iter->second << "\n";
+//      }
+//      osTrack << "\n";
+//      std::cout << osTrack.str();
+//    }
+//  }
+
+//    SfM_Data sfm_data_known;
+//    string sSfM_Data_Filename = "/home/rm/Desktop/sfm_data_known.json";
+//    if (!Load(sfm_data_known, sSfM_Data_Filename, ESfM_Data(STRUCTURE))) {
+//      std::cerr << std::endl
+//        << "The input SfM_Data file \""<< sSfM_Data_Filename << "\" cannot be read." << std::endl;
+//      return EXIT_FAILURE;
+//    }
+
+//    sfm_data_.structure.insert(sfm_data_known.structure.begin(), sfm_data_known.structure.end());
+
+//  // Compute 3D position of the landmark of the structure by triangulation of the observations
+//  {
+//    openMVG::system::Timer timer;
+
+//    const IndexT trackCountBefore = sfm_data_.GetLandmarks().size();
+//    SfM_Data_Structure_Computation_Blind structure_estimator(true);
+//    structure_estimator.triangulate(sfm_data_);
+
+//    std::cout << "\n#removed tracks (invalid triangulation): " <<
+//      trackCountBefore - IndexT(sfm_data_.GetLandmarks().size()) << std::endl;
+//    std::cout << std::endl << "  Triangulation took (s): " << timer.elapsed() << std::endl;
+//  }
+
+
+// list by openMVG
+// /////////////////////////////////////////////////////////////////////////////////
+// openMVG global approach
+
+//  auto structure_openMVG_bkp2 = sfm_data_.structure;
+//  sfm_data_.structure.clear();
+
+//  Hash_Map<IndexT, Mat3> global_rotations;
+//  int i = 0;
+//  for (const auto & pose : sfm_data_.poses){
+//      global_rotations.emplace(make_pair(pose.first, pose.second.rotation()));
+//      i++;
+//    }
+
+//  matching::PairWiseMatches  tripletWise_matches;
+//  if (!Compute_Global_Translations(global_rotations, tripletWise_matches))
+//  {
+//    std::cerr << "GlobalSfM:: Translation Averaging failure!" << std::endl;
+//    return false;
+//  }
+
+//  if (!Compute_Initial_Structure(matches_provider_->pairWise_matches_))
+//  if (!Compute_Initial_Structure(tripletWise_matches))
+//  {
+//    std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
+//    return false;
+//  }
+
+
+
+  // merge
+  sfm_data_.structure.insert(structure_okvis_bkp.begin(), structure_okvis_bkp.end());
+
   if (!Adjust())
   {
     std::cerr << "GlobalSfM:: Non-linear adjustment failure!" << std::endl;
@@ -339,6 +573,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Global_Translations
 {
   // Translation averaging (compute translations & update them to a global common coordinates system)
   GlobalSfM_Translation_AveragingSolver translation_averaging_solver;
+  std::cout << "Compute Global Translations" << std::endl;
   const bool bTranslationAveraging = translation_averaging_solver.Run(
     eTranslation_averaging_method_,
     sfm_data_,
@@ -383,7 +618,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
     // Use triplet validated matches
     tracksBuilder.Build(tripletWise_matches);
 #endif
-    tracksBuilder.Filter(3);
+    tracksBuilder.Filter(); //Filter(3);
     STLMAPTracks map_selectedTracks; // reconstructed track (visibility per 3D point)
     tracksBuilder.ExportToSTL(map_selectedTracks);
 
@@ -466,6 +701,12 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   {
     Save(sfm_data_,
       stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "input_raw", "ply"),
+      ESfM_Data(EXTRINSICS | STRUCTURE));
+  }
+  if (!sLogging_file_.empty())
+  {
+    Save(sfm_data_,
+      stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "input_raw", "json"),
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
@@ -552,7 +793,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 
   // Check that poses & intrinsic cover some measures (after outlier removal)
   const IndexT minPointPerPose = 12; // 6 min
-  const IndexT minTrackLength = 3; // 2 min
+  const IndexT minTrackLength = 2; // 2 min, was 3
   if (eraseUnstablePosesAndObservations(sfm_data_, minPointPerPose, minTrackLength))
   {
     // TODO: must ensure that track graph is producing a single connected component
