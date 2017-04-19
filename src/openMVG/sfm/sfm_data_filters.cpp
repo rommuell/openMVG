@@ -55,7 +55,7 @@ IndexT RemoveOutliers_PixelResidualError
       const geometry::Pose3 pose = sfm_data.GetPoseOrDie(view);
       const cameras::IntrinsicBase * intrinsic = sfm_data.intrinsics.at(view->id_intrinsic).get();
       const Vec2 residual = intrinsic->residual(pose, iterTracks->second.X, itObs->second.x);
-      if (residual.norm() > dThresholdPixel)
+      if (residual.norm() > dThresholdPixel && !iterTracks->second.b_external) // do not delete external (okvis) observations
       {
         ++outlier_count;
         itObs = obs.erase(itObs);
@@ -63,7 +63,7 @@ IndexT RemoveOutliers_PixelResidualError
       else
         ++itObs;
     }
-    if (obs.empty() || obs.size() < minTrackLength)
+    if ((obs.empty() || obs.size() < minTrackLength) && !iterTracks->second.b_external)
       iterTracks = sfm_data.structure.erase(iterTracks);
     else
       ++iterTracks;
@@ -106,7 +106,7 @@ IndexT RemoveOutliers_AngleError
         max_angle = std::max(angle, max_angle);
       }
     }
-    if (max_angle < dMinAcceptedAngle)
+    if (max_angle < dMinAcceptedAngle && !iterTracks->second.b_external)
     {
       iterTracks = sfm_data.structure.erase(iterTracks);
       ++removedTrack_count;

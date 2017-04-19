@@ -227,82 +227,81 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //  IndexT id_gen = 0;
         // In order to visit all the tracks, follow this code:
 
-  if (false){
+  if (false){ // enable(false) / disable(true) openMVG features
     map_tracks.clear();
 //    map_tracks.emplace(make_pair(0, ))
     }
-        for (tracks::STLMAPTracks::const_iterator iterT = map_tracks.begin();
-                iterT != map_tracks.end(); ++ iterT)
-        {
+  for (tracks::STLMAPTracks::const_iterator iterT = map_tracks.begin();
+          iterT != map_tracks.end(); ++ iterT)
+  {
 
-                const tracks::submapTrack & track = iterT->second;
-                const IndexT trackId = iterT->first;
+          const tracks::submapTrack & track = iterT->second;
+          const IndexT trackId = iterT->first;
 
-                const Mat34 P1 = cam->get_projective_equivalent(sfm_data_.poses[track.begin()->first]);
-                const Mat34 P2 = cam->get_projective_equivalent(sfm_data_.poses[track.rbegin()->first]);
-                const Vec2 x1_ = features_provider_->feats_per_view[track.begin()->first][track.begin()->second].coords().cast<double>();
-                const Vec2 x2_ = features_provider_->feats_per_view[track.rbegin()->first][track.rbegin()->second].coords().cast<double>();
-                Landmark lm;
-                TriangulateDLT(P1, x1_, P2, x2_, &lm.X);
+          const Mat34 P1 = cam->get_projective_equivalent(sfm_data_.poses[track.begin()->first]);
+          const Mat34 P2 = cam->get_projective_equivalent(sfm_data_.poses[track.rbegin()->first]);
+          const Vec2 x1_ = features_provider_->feats_per_view[track.begin()->first][track.begin()->second].coords().cast<double>();
+          const Vec2 x2_ = features_provider_->feats_per_view[track.rbegin()->first][track.rbegin()->second].coords().cast<double>();
+          Landmark lm;
+          TriangulateDLT(P1, x1_, P2, x2_, &lm.X);
 //                lm.X.setZero();
 
-                Vec3 X;
-                if(track.size() == 3){
-                    tracks::submapTrack::const_iterator it = track.begin();
-                    const Mat34 P3 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
-                    const Vec2 x3_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
+//          Vec3 X;
+//          if(track.size() == 3){
+//              tracks::submapTrack::const_iterator it = track.begin();
+//              const Mat34 P3 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
+//              const Vec2 x3_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
 
-                    it++;
-                    const Mat34 P4 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
-                    const Vec2 x4_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
+//              it++;
+//              const Mat34 P4 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
+//              const Vec2 x4_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
 
 
-                    TriangulateDLT(P3, x3_, P4, x4_, &X);
-                    cout << "first-last" << endl << lm.X<< endl << endl;
-                    cout << "first-second" << endl << X << endl;
-                    cout << "angle: " << acos(lm.X.dot(X) / (lm.X.norm() * X.norm())) / M_PI * 180 << endl;
-                    cout << "distance ratio; " << lm.X.norm() / X.norm() << endl;
-                    cout << endl;
-                  }
+//              TriangulateDLT(P3, x3_, P4, x4_, &X);
+//              cout << "first-last" << endl << lm.X<< endl << endl;
+//              cout << "first-second" << endl << X << endl;
+//              cout << "angle: " << acos(lm.X.dot(X) / (lm.X.norm() * X.norm())) / M_PI * 180 << endl;
+//              cout << "distance ratio; " << lm.X.norm() / X.norm() << endl;
+//              cout << endl;
+//            }
 
-                  SfM_Data tiny_scene;
+          SfM_Data tiny_scene;
+          tiny_scene.intrinsics.insert(*sfm_data_.GetIntrinsics().find(0)); //add intrinsic
 
-                  tiny_scene.intrinsics.insert(*sfm_data_.GetIntrinsics().find(0));
+          //feed 2D observations into sfm_data_structure
+          for ( tracks::submapTrack::const_iterator iterTrack = track.begin();
+            iterTrack != track.end(); ++iterTrack)
+          {
+              tiny_scene.views.insert(*sfm_data_.GetViews().find(iterTrack->first));
+              tiny_scene.poses[iterTrack->first] = sfm_data_.poses[iterTrack->first];
 
-                //feed 2D observations into sfm_data_structure
-                for ( tracks::submapTrack::const_iterator iterTrack = track.begin();
-                  iterTrack != track.end(); ++iterTrack)
-                {
-                    tiny_scene.views.insert(*sfm_data_.GetViews().find(iterTrack->first));
-                    tiny_scene.poses[iterTrack->first] = sfm_data_.poses[iterTrack->first];
-
-                    Observation ob;
-                    ob.id_feat = iterTrack->second;
-                    ob.x = features_provider_->feats_per_view[iterTrack->first][iterTrack->second].coords().cast<double>();
+              Observation ob;
+              ob.id_feat = iterTrack->second;
+              ob.x = features_provider_->feats_per_view[iterTrack->first][iterTrack->second].coords().cast<double>();
 //                        const IndexT imageId = iterTrack->first;
 //                        const IndexT featId = iterTrack->second;
-                    lm.obs.emplace(make_pair(iterTrack->first, ob));
+              lm.obs.emplace(make_pair(iterTrack->first, ob));
 //                    id_gen++;
 
-                        // Get the feature point
+                  // Get the feature point
+          }
+          tiny_scene.structure.emplace(make_pair(trackId, lm));
+
+          Bundle_Adjustment_Ceres::BA_Ceres_options options(false, false);
+          options.linear_solver_type_ = ceres::DENSE_SCHUR;
+          Bundle_Adjustment_Ceres bundle_adjustment_obj(options);
+          const Optimize_Options ba_refine_options
+            (Intrinsic_Parameter_Type::NONE, // -> Keep intrinsic constant
+            Extrinsic_Parameter_Type::NONE, // adjust camera motion
+            Structure_Parameter_Type::ADJUST_ALL);// adjust scene structure
+          if (bundle_adjustment_obj.Adjust(tiny_scene, ba_refine_options))
+          {
+              if(tiny_scene.structure.begin()->second.X.norm() < 100){ //filter landmarks more than 100 units away
+                  sfm_data_.structure.insert(tiny_scene.structure.begin(), tiny_scene.structure.end());
                 }
-                tiny_scene.structure.emplace(make_pair(trackId, lm));
 
-                Bundle_Adjustment_Ceres::BA_Ceres_options options(false, false);
-                options.linear_solver_type_ = ceres::DENSE_SCHUR;
-                Bundle_Adjustment_Ceres bundle_adjustment_obj(options);
-                const Optimize_Options ba_refine_options
-                  (Intrinsic_Parameter_Type::NONE, // -> Keep intrinsic constant
-                  Extrinsic_Parameter_Type::NONE, // adjust camera motion
-                  Structure_Parameter_Type::ADJUST_ALL);// adjust scene structure
-                if (bundle_adjustment_obj.Adjust(tiny_scene, ba_refine_options))
-                {
-                    if(tiny_scene.structure.begin()->second.X.norm() < 100){
-                        sfm_data_.structure.insert(tiny_scene.structure.begin(), tiny_scene.structure.end());
-                      }
-
-                  }
-        }
+            }
+  }
 
 //    SfM_Data_Structure_Computation_Blind structure_estimator(true);
 //    structure_estimator.triangulate(sfm_data_);
@@ -424,6 +423,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 
   // merge
   sfm_data_.structure.insert(structure_okvis_bkp.begin(), structure_okvis_bkp.end());
+//  sfm_data_.structure = structure_okvis_bkp; // uncomment this line for only okvis structure
 
   if (!Adjust())
   {
@@ -792,7 +792,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   }
 
   // Check that poses & intrinsic cover some measures (after outlier removal)
-  const IndexT minPointPerPose = 12; // 6 min
+  const IndexT minPointPerPose = 6; // 6 min,was 12
   const IndexT minTrackLength = 2; // 2 min, was 3
   if (eraseUnstablePosesAndObservations(sfm_data_, minPointPerPose, minTrackLength))
   {

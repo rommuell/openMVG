@@ -246,7 +246,7 @@ bool Bundle_Adjustment_Ceres::Adjust
         std::cout << "nullptr" << std::endl;
       }
 
-    std::cout << "idPose: " << indexPose << " idView/pose: " /*<< view_pose_prior->id_view << "," << view_pose_prior->id_pose*/
+    std::cout << "idPose: " << indexPose /*<< " idView/pose: " << view_pose_prior->id_view << "," << view_pose_prior->id_pose*/
          << " b_fix_pose: " << b_fix_pose << std::endl;
 
     Mat3 R;
@@ -449,9 +449,11 @@ bool Bundle_Adjustment_Ceres::Adjust
   ceres_config_options.logging_type = ceres::SILENT;
   ceres_config_options.num_threads = ceres_options_.nb_threads_;
   ceres_config_options.num_linear_solver_threads = ceres_options_.nb_threads_;
-//  ceres_config_options.parameter_tolerance = ceres_options_.parameter_tolerance_;
-  ceres_config_options.parameter_tolerance = 1e-10;
-  ceres_config_options.function_tolerance = 1e-10;
+  ceres_config_options.parameter_tolerance = ceres_options_.parameter_tolerance_;
+//  //rm
+//  ceres_config_options.parameter_tolerance = 1e-10;
+//  ceres_config_options.function_tolerance = 1e-10;
+//  //end rm
 
   // Solve BA
   ceres::Solver::Summary summary;
