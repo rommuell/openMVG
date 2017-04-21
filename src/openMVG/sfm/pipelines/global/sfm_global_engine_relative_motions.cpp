@@ -91,6 +91,10 @@ void GlobalSfMReconstructionEngine_RelativeMotions::SetTranslationAveragingMetho
 
 bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
 
+  //rm
+//  sfm_data_.structure. clear();
+//  sfm_data_.poses.clear();
+
   //-------------------
   // Keep only the largest biedge connected subgraph
   //-------------------
@@ -168,6 +172,9 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
 
 bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 
+  auto structure_okvis_bkp = sfm_data_.structure;
+  sfm_data_.structure.clear();
+
   //-------------------
   // Keep only the largest biedge connected subgraph
   //-------------------
@@ -205,8 +212,6 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //    return false;
 //  }
 
-  auto structure_okvis_bkp = sfm_data_.structure;
-  sfm_data_.structure.clear();
 
   using namespace openMVG::matching;
 //  // pairwise matches container:
@@ -229,8 +234,9 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 
   if (false){ // enable(false) / disable(true) openMVG features
     map_tracks.clear();
-//    map_tracks.emplace(make_pair(0, ))
     }
+
+  int lmDropped = -1;
   for (tracks::STLMAPTracks::const_iterator iterT = map_tracks.begin();
           iterT != map_tracks.end(); ++ iterT)
   {
@@ -297,11 +303,28 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
           if (bundle_adjustment_obj.Adjust(tiny_scene, ba_refine_options))
           {
               if(tiny_scene.structure.begin()->second.X.norm() < 100){ //filter landmarks more than 100 units away
-                  sfm_data_.structure.insert(tiny_scene.structure.begin(), tiny_scene.structure.end());
+//                  Vec3 X_res = tiny_scene.structure.begin()->second.X;
+//                  bool allInFront = true;
+//                  for (auto it_pose = tiny_scene.poses.begin(); it_pose != tiny_scene.poses.end(); it_pose++){
+//                    Vec3 test = tiny_scene.poses[0].rotation()* X_res + tiny_scene.poses[1].translation();
+//                    if (test[2] > 0){
+//                        cout << "point behind camera, z = " << test[2] << endl;
+//                        cout << endl;
+//                        allInFront = false;
+//                        break;
+//                      }
+//                    }
+//                  if (allInFront){
+                      sfm_data_.structure.insert(tiny_scene.structure.begin(), tiny_scene.structure.end());
+//                  } else {
+//                      lmDropped++;
+//                    }
                 }
 
             }
-  }
+  } // for loop tracks
+  cout << "landmarks dropped: " << lmDropped << endl; //
+  cout << endl;
 
 //    SfM_Data_Structure_Computation_Blind structure_estimator(true);
 //    structure_estimator.triangulate(sfm_data_);
@@ -791,17 +814,19 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
-  // Check that poses & intrinsic cover some measures (after outlier removal)
-  const IndexT minPointPerPose = 6; // 6 min,was 12
-  const IndexT minTrackLength = 2; // 2 min, was 3
-  if (eraseUnstablePosesAndObservations(sfm_data_, minPointPerPose, minTrackLength))
-  {
-    // TODO: must ensure that track graph is producing a single connected component
+//  do not remove any poses, do not remove any landmarks (with less than two observations)
+//  because a lot of okvis traks have just a length of 2
+    //  // Check that poses & intrinsic cover some measures (after outlier removal)
+    //  const IndexT minPointPerPose = 6; // 6 min,was 12
+    //  const IndexT minTrackLength = 2; // 2 min, was 3
+    //  if (eraseUnstablePosesAndObservations(sfm_data_, minPointPerPose, minTrackLength))
+    //  {
+    //    // TODO: must ensure that track graph is producing a single connected component
 
-    const size_t pointcount_cleaning = sfm_data_.structure.size();
-    std::cout << "Point_cloud cleaning:\n"
-      << "\t #3DPoints: " << pointcount_cleaning << "\n";
-  }
+    //    const size_t pointcount_cleaning = sfm_data_.structure.size();
+    //    std::cout << "Point_cloud cleaning:\n"
+    //      << "\t #3DPoints: " << pointcount_cleaning << "\n";
+    //  }
 
   // --
   // Final BA. We refine one more time,

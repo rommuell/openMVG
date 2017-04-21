@@ -240,7 +240,7 @@ bool Bundle_Adjustment_Ceres::Adjust
 //      const sfm::ViewPriors * prior = dynamic_cast<sfm::ViewPriors*>(view_it.second.get());
     const sfm::ViewPriors * view_pose_prior = dynamic_cast<sfm::ViewPriors*>(sfm_data.views.at(indexPose).get());
     bool b_fix_pose = false;
-    if (view_pose_prior != nullptr){
+    if (view_pose_prior != nullptr){ //in case a prior was provided
         b_fix_pose = view_pose_prior->b_fix_pose_; // && view_pose_prior != nullptr && sfm_data.IsPoseAndIntrinsicDefined(view_pose_prior);
       } else {
         std::cout << "nullptr" << std::endl;
@@ -249,11 +249,23 @@ bool Bundle_Adjustment_Ceres::Adjust
     std::cout << "idPose: " << indexPose /*<< " idView/pose: " << view_pose_prior->id_view << "," << view_pose_prior->id_pose*/
          << " b_fix_pose: " << b_fix_pose << std::endl;
 
-    Mat3 R;
-    Vec3 t;
+    Mat3 R, R2;
+    Vec3 t, t2;
     if (b_fix_pose){ //use data saved in prior
         R = view_pose_prior->pose_rotation_;
         t = -( R * view_pose_prior->pose_center_ );
+
+        // for debugging
+        const Pose3 & pose = pose_it.second;
+        R2 = pose.rotation();
+        t2 = pose.translation();
+
+        {
+          using namespace std;
+          cout << "R" << endl << R << endl << endl << "R2" << endl << R2 << endl << endl;
+          cout << "t" << endl << t << endl << endl << "t2" << endl << t2 << endl;
+          cout << endl;
+        }
       } else {
         // use data calculated in steps before (rel Rot, glob Rot, transl.)
         // in case data poses are given, it is overwritten by identical data
@@ -441,7 +453,7 @@ bool Bundle_Adjustment_Ceres::Adjust
   // Configure a BA engine and run it
   //  Make Ceres automatically detect the bundle structure.
   ceres::Solver::Options ceres_config_options;
-  ceres_config_options.max_num_iterations = 3000; //500rm
+  ceres_config_options.max_num_iterations = 500; //500rm
   ceres_config_options.preconditioner_type = ceres_options_.preconditioner_type_;
   ceres_config_options.linear_solver_type = ceres_options_.linear_solver_type_;
   ceres_config_options.sparse_linear_algebra_library_type = ceres_options_.sparse_linear_algebra_library_type_;
