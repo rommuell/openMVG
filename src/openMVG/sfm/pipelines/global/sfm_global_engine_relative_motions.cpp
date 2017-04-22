@@ -211,126 +211,147 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //    std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
 //    return false;
 //  }
-
-
-  using namespace openMVG::matching;
-//  // pairwise matches container:
-//  PairWiseMatches map_Matches;
-
-//  // Fil the pairwise correspondeces or load a series of pairwise matches from a file
-//  PairedIndMatchImport("matches.f.txt", map_Matches);
-  const IntrinsicBase * cam = sfm_data_.GetIntrinsics().at(0).get();
-
-  //---------------------------------------
-  // Compute tracks from pairwise matches
-  //---------------------------------------
-  openMVG::tracks::TracksBuilder tracksBuilder;
-  tracks::STLMAPTracks map_tracks;  // The track container
-  tracksBuilder.Build(matches_provider_->pairWise_matches_); // Build: Efficient fusion of correspondences
-  tracksBuilder.Filter();           // Filter: Remove track that have conflict
-  tracksBuilder.ExportToSTL(map_tracks); // Build tracks with STL compliant type
-//  IndexT id_gen = 0;
-        // In order to visit all the tracks, follow this code:
-
-  if (false){ // enable(false) / disable(true) openMVG features
-    map_tracks.clear();
+  Hash_Map<IndexT, Mat3> global_rotations;
+  int i = 0;
+  for (auto it = sfm_data_.poses.begin(); it != sfm_data_.poses.end(); it++, i++){
+      global_rotations.emplace(make_pair(i, it->second.rotation()));
     }
-
-  int lmDropped = -1;
-  for (tracks::STLMAPTracks::const_iterator iterT = map_tracks.begin();
-          iterT != map_tracks.end(); ++ iterT)
+  auto poses_bkp = sfm_data_.poses;
+  matching::PairWiseMatches  tripletWise_matches;
+  if (!Compute_Global_Translations(global_rotations, tripletWise_matches))
   {
-
-          const tracks::submapTrack & track = iterT->second;
-          const IndexT trackId = iterT->first;
-
-          const Mat34 P1 = cam->get_projective_equivalent(sfm_data_.poses[track.begin()->first]);
-          const Mat34 P2 = cam->get_projective_equivalent(sfm_data_.poses[track.rbegin()->first]);
-          const Vec2 x1_ = features_provider_->feats_per_view[track.begin()->first][track.begin()->second].coords().cast<double>();
-          const Vec2 x2_ = features_provider_->feats_per_view[track.rbegin()->first][track.rbegin()->second].coords().cast<double>();
-          Landmark lm;
-          TriangulateDLT(P1, x1_, P2, x2_, &lm.X);
-//                lm.X.setZero();
-
-//          Vec3 X;
-//          if(track.size() == 3){
-//              tracks::submapTrack::const_iterator it = track.begin();
-//              const Mat34 P3 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
-//              const Vec2 x3_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
-
-//              it++;
-//              const Mat34 P4 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
-//              const Vec2 x4_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
+    std::cerr << "GlobalSfM:: Translation Averaging failure!" << std::endl;
+    return false;
+  }
+  sfm_data_.poses = poses_bkp;
+  if (!Compute_Initial_Structure(tripletWise_matches))
+  {
+    std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
+    return false;
+  }
+  Save(sfm_data_,
+    "/home/rm/Desktop/test.ply",
+    ESfM_Data(ALL));
 
 
-//              TriangulateDLT(P3, x3_, P4, x4_, &X);
-//              cout << "first-last" << endl << lm.X<< endl << endl;
-//              cout << "first-second" << endl << X << endl;
-//              cout << "angle: " << acos(lm.X.dot(X) / (lm.X.norm() * X.norm())) / M_PI * 180 << endl;
-//              cout << "distance ratio; " << lm.X.norm() / X.norm() << endl;
-//              cout << endl;
-//            }
+//                              using namespace openMVG::matching;
+//                            //  // pairwise matches container:
+//                            //  PairWiseMatches map_Matches;
 
-          SfM_Data tiny_scene;
-          tiny_scene.intrinsics.insert(*sfm_data_.GetIntrinsics().find(0)); //add intrinsic
+//                            //  // Fil the pairwise correspondeces or load a series of pairwise matches from a file
+//                            //  PairedIndMatchImport("matches.f.txt", map_Matches);
+//                              const IntrinsicBase * cam = sfm_data_.GetIntrinsics().at(0).get();
 
-          //feed 2D observations into sfm_data_structure
-          for ( tracks::submapTrack::const_iterator iterTrack = track.begin();
-            iterTrack != track.end(); ++iterTrack)
-          {
-              tiny_scene.views.insert(*sfm_data_.GetViews().find(iterTrack->first));
-              tiny_scene.poses[iterTrack->first] = sfm_data_.poses[iterTrack->first];
+//                              //---------------------------------------
+//                              // Compute tracks from pairwise matches
+//                              //---------------------------------------
+//                              openMVG::tracks::TracksBuilder tracksBuilder;
+//                              tracks::STLMAPTracks map_tracks;  // The track container
+//                              tracksBuilder.Build(matches_provider_->pairWise_matches_); // Build: Efficient fusion of correspondences
+//                              tracksBuilder.Filter();           // Filter: Remove track that have conflict
+//                              tracksBuilder.ExportToSTL(map_tracks); // Build tracks with STL compliant type
+//                            //  IndexT id_gen = 0;
+//                                    // In order to visit all the tracks, follow this code:
 
-              Observation ob;
-              ob.id_feat = iterTrack->second;
-              ob.x = features_provider_->feats_per_view[iterTrack->first][iterTrack->second].coords().cast<double>();
-//                        const IndexT imageId = iterTrack->first;
-//                        const IndexT featId = iterTrack->second;
-              lm.obs.emplace(make_pair(iterTrack->first, ob));
-//                    id_gen++;
+//                              if (false){ // enable(false) / disable(true) openMVG features
+//                                map_tracks.clear();
+//                                }
 
-                  // Get the feature point
-          }
-          tiny_scene.structure.emplace(make_pair(trackId, lm));
+//                              int lmDropped = -1;
+//                              for (tracks::STLMAPTracks::const_iterator iterT = map_tracks.begin();
+//                                      iterT != map_tracks.end(); ++ iterT)
+//                              {
 
-          Bundle_Adjustment_Ceres::BA_Ceres_options options(false, false);
-          options.linear_solver_type_ = ceres::DENSE_SCHUR;
-          Bundle_Adjustment_Ceres bundle_adjustment_obj(options);
-          const Optimize_Options ba_refine_options
-            (Intrinsic_Parameter_Type::NONE, // -> Keep intrinsic constant
-            Extrinsic_Parameter_Type::NONE, // adjust camera motion
-            Structure_Parameter_Type::ADJUST_ALL);// adjust scene structure
-          if (bundle_adjustment_obj.Adjust(tiny_scene, ba_refine_options))
-          {
-              if(tiny_scene.structure.begin()->second.X.norm() < 100){ //filter landmarks more than 100 units away
-//                  Vec3 X_res = tiny_scene.structure.begin()->second.X;
-//                  bool allInFront = true;
-//                  for (auto it_pose = tiny_scene.poses.begin(); it_pose != tiny_scene.poses.end(); it_pose++){
-//                    Vec3 test = tiny_scene.poses[0].rotation()* X_res + tiny_scene.poses[1].translation();
-//                    if (test[2] > 0){
-//                        cout << "point behind camera, z = " << test[2] << endl;
-//                        cout << endl;
-//                        allInFront = false;
-//                        break;
-//                      }
-//                    }
-//                  if (allInFront){
-                      sfm_data_.structure.insert(tiny_scene.structure.begin(), tiny_scene.structure.end());
-//                  } else {
-//                      lmDropped++;
-//                    }
-                }
+//                                      const tracks::submapTrack & track = iterT->second;
+//                                      const IndexT trackId = iterT->first;
 
-            }
-  } // for loop tracks
-  cout << "landmarks dropped: " << lmDropped << endl; //
-  cout << endl;
+//                                      const Mat34 P1 = cam->get_projective_equivalent(sfm_data_.poses[track.begin()->first]);
+//                                      const Mat34 P2 = cam->get_projective_equivalent(sfm_data_.poses[track.rbegin()->first]);
+//                                      const Vec2 x1_ = features_provider_->feats_per_view[track.begin()->first][track.begin()->second].coords().cast<double>();
+//                                      const Vec2 x2_ = features_provider_->feats_per_view[track.rbegin()->first][track.rbegin()->second].coords().cast<double>();
+//                                      Landmark lm;
+//                                      TriangulateDLT(P1, x1_, P2, x2_, &lm.X);
+//                            //                lm.X.setZero();
 
-//    SfM_Data_Structure_Computation_Blind structure_estimator(true);
-//    structure_estimator.triangulate(sfm_data_);
+//                            //          Vec3 X;
+//                            //          if(track.size() == 3){
+//                            //              tracks::submapTrack::const_iterator it = track.begin();
+//                            //              const Mat34 P3 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
+//                            //              const Vec2 x3_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
 
-// list by rm
-////////////////////////////////////////////////////////////////////////////////////
+//                            //              it++;
+//                            //              const Mat34 P4 = cam->get_projective_equivalent(sfm_data_.poses[it->first]);
+//                            //              const Vec2 x4_ = features_provider_->feats_per_view[it->first][it->second].coords().cast<double>();
+
+
+//                            //              TriangulateDLT(P3, x3_, P4, x4_, &X);
+//                            //              cout << "first-last" << endl << lm.X<< endl << endl;
+//                            //              cout << "first-second" << endl << X << endl;
+//                            //              cout << "angle: " << acos(lm.X.dot(X) / (lm.X.norm() * X.norm())) / M_PI * 180 << endl;
+//                            //              cout << "distance ratio; " << lm.X.norm() / X.norm() << endl;
+//                            //              cout << endl;
+//                            //            }
+
+//                                      SfM_Data tiny_scene;
+//                                      tiny_scene.intrinsics.insert(*sfm_data_.GetIntrinsics().find(0)); //add intrinsic
+
+//                                      //feed 2D observations into sfm_data_structure
+//                                      for ( tracks::submapTrack::const_iterator iterTrack = track.begin();
+//                                        iterTrack != track.end(); ++iterTrack)
+//                                      {
+//                                          tiny_scene.views.insert(*sfm_data_.GetViews().find(iterTrack->first));
+//                                          tiny_scene.poses[iterTrack->first] = sfm_data_.poses[iterTrack->first];
+
+//                                          Observation ob;
+//                                          ob.id_feat = iterTrack->second;
+//                                          ob.x = features_provider_->feats_per_view[iterTrack->first][iterTrack->second].coords().cast<double>();
+//                            //                        const IndexT imageId = iterTrack->first;
+//                            //                        const IndexT featId = iterTrack->second;
+//                                          lm.obs.emplace(make_pair(iterTrack->first, ob));
+//                            //                    id_gen++;
+
+//                                              // Get the feature point
+//                                      }
+//                                      tiny_scene.structure.emplace(make_pair(trackId, lm));
+
+//                                      Bundle_Adjustment_Ceres::BA_Ceres_options options(false, false);
+//                                      options.linear_solver_type_ = ceres::DENSE_SCHUR;
+//                                      Bundle_Adjustment_Ceres bundle_adjustment_obj(options);
+//                                      const Optimize_Options ba_refine_options
+//                                        (Intrinsic_Parameter_Type::NONE, // -> Keep intrinsic constant
+//                                        Extrinsic_Parameter_Type::NONE, // adjust camera motion
+//                                        Structure_Parameter_Type::ADJUST_ALL);// adjust scene structure
+//                                      if (bundle_adjustment_obj.Adjust(tiny_scene, ba_refine_options))
+//                                      {
+//                                          if(tiny_scene.structure.begin()->second.X.norm() < 100){ //filter landmarks more than 100 units away
+//                            //                  Vec3 X_res = tiny_scene.structure.begin()->second.X;
+//                            //                  bool allInFront = true;
+//                            //                  for (auto it_pose = tiny_scene.poses.begin(); it_pose != tiny_scene.poses.end(); it_pose++){
+//                            //                    Vec3 test = tiny_scene.poses[0].rotation()* X_res + tiny_scene.poses[1].translation();
+//                            //                    if (test[2] > 0){
+//                            //                        cout << "point behind camera, z = " << test[2] << endl;
+//                            //                        cout << endl;
+//                            //                        allInFront = false;
+//                            //                        break;
+//                            //                      }
+//                            //                    }
+//                            //                  if (allInFront){
+//                                                  sfm_data_.structure.insert(tiny_scene.structure.begin(), tiny_scene.structure.end());
+//                            //                  } else {
+//                            //                      lmDropped++;
+//                            //                    }
+//                                            }
+
+//                                        }
+//                              } // for loop tracks
+//                              cout << "landmarks dropped: " << lmDropped << endl; //
+//                              cout << endl;
+
+//                            //    SfM_Data_Structure_Computation_Blind structure_estimator(true);
+//                            //    structure_estimator.triangulate(sfm_data_);
+
+//                            // list by rm
+//                            ////////////////////////////////////////////////////////////////////////////////////
 // list by openMVG
 //{
 //    using namespace openMVG::tracks;
@@ -799,7 +820,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   const size_t pointcount_initial = sfm_data_.structure.size();
   RemoveOutliers_PixelResidualError(sfm_data_, 4.0); //4.0rm
   const size_t pointcount_pixelresidual_filter = sfm_data_.structure.size();
-  RemoveOutliers_AngleError(sfm_data_, 2.0); //reconstruction fails with 1.5
+  RemoveOutliers_AngleError(sfm_data_, 2.0); //2.0, reconstruction fails with 1.5
 //  std::cout << "3, 2.0" << std::endl;
   const size_t pointcount_angular_filter = sfm_data_.structure.size();
   std::cout << "Outlier removal (remaining #points):\n"
