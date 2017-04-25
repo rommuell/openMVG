@@ -469,6 +469,30 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
   sfm_data_.structure.insert(structure_okvis_bkp.begin(), structure_okvis_bkp.end());
 //  sfm_data_.structure = structure_okvis_bkp; // uncomment this line for only okvis structure
 
+  //filter out lm only connected to fixed poses
+
+  auto it = sfm_data_.structure.begin();
+  do{
+      bool b_has_flex_pose = false;
+      cout << "lm " << it->first << endl;
+      for (auto itO = it->second.obs.begin(); itO != it->second.obs.end(); itO++){
+          const sfm::ViewPriors * view_pose_prior = dynamic_cast<sfm::ViewPriors*>(sfm_data_.views.at(itO->first).get());
+          bool b_fix = false;
+          if (view_pose_prior != nullptr){
+              b_fix = view_pose_prior->b_fix_pose_;
+            }
+          cout << "obs " << itO->first << endl;
+          b_has_flex_pose |= !b_fix;
+        }
+      if (b_has_flex_pose){
+          it++;
+          cout << "ok" << endl;
+      } else {
+          it = sfm_data_.structure.erase(it);
+          cout << "deleted" << endl;
+        }
+    } while (it != sfm_data_.structure.end());
+
   if (!Adjust())
   {
     std::cerr << "GlobalSfM:: Non-linear adjustment failure!" << std::endl;
