@@ -77,26 +77,33 @@ inline bool Save_PLY(
       {
         for (const auto & view : sfm_data.GetViews())
         {
+          // Export pose priors as Blue points and fixed poses as red points
+          std::string position = "";
+          if (const sfm::ViewPriors *prior = dynamic_cast<sfm::ViewPriors*>(view.second.get()))
+          {
+            if (prior->b_use_pose_center_) {
+              position = std::to_string(prior->pose_center_(0)) + ' ' +
+                         std::to_string(prior->pose_center_(1)) + ' ' +
+                         std::to_string(prior->pose_center_(2)) + ' ';
+                stream << position << "0 0 255\n";
+            }
+            else if (prior->b_fix_pose_) {
+                position = std::to_string(prior->pose_center_(0)) + ' ' +
+                           std::to_string(prior->pose_center_(1)) + ' ' +
+                           std::to_string(prior->pose_center_(2)) + ' ';
+                stream << position << "255 0 0\n";
+            }
+          }
+
           // Export pose as Green points
           if (sfm_data.IsPoseAndIntrinsicDefined(view.second.get()))
           {
             const geometry::Pose3 pose = sfm_data.GetPoseOrDie(view.second.get());
-            stream
-              << pose.center()(0) << ' '
-              << pose.center()(1) << ' '
-              << pose.center()(2) << ' '
-              << "0 255 0\n";
-          }
-
-          // Export pose priors as Blue points
-          if (const sfm::ViewPriors *prior = dynamic_cast<sfm::ViewPriors*>(view.second.get()))
-          {
-            if (prior->b_use_pose_center_) {
-              stream
-                << prior->pose_center_(0) << ' '
-                << prior->pose_center_(1) << ' '
-                << prior->pose_center_(2) << ' '
-                << "0 0 255\n";
+            std::string position2 = std::to_string(pose.center()(0)) + ' ' +
+                                    std::to_string(pose.center()(1)) + ' ' +
+                                    std::to_string(pose.center()(2)) + ' ';
+            if (!(position == position2)){ // in case prior/fix and resulting pose are not on identical
+                stream << position2 << "0 255 0\n";
             }
           }
         }
