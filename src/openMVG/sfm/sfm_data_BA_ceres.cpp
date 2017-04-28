@@ -242,39 +242,43 @@ bool Bundle_Adjustment_Ceres::Adjust
     bool b_fix_pose = false;
     if (view_pose_prior != nullptr){ //in case a prior was provided
         b_fix_pose = view_pose_prior->b_fix_pose_; // && view_pose_prior != nullptr && sfm_data.IsPoseAndIntrinsicDefined(view_pose_prior);
-      } else {
-        std::cout << "nullptr" << std::endl;
-      }
+      } //else {
+//        std::cout << "nullptr" << std::endl;
+//      }
 
-    std::cout << "idPose: " << indexPose /*<< " idView/pose: " << view_pose_prior->id_view << "," << view_pose_prior->id_pose*/
-         << " b_fix_pose: " << b_fix_pose << std::endl;
+//    std::cout << "idPose: " << indexPose /*<< " idView/pose: " << view_pose_prior->id_view << "," << view_pose_prior->id_pose*/
+//         << " b_fix_pose: " << b_fix_pose << std::endl;
 
-    Mat3 R, R2;
-    Vec3 t, t2;
-    if (b_fix_pose){ //use data saved in prior
-        R = view_pose_prior->pose_rotation_;
-        t = -( R * view_pose_prior->pose_center_ );
+    // not necessary step as poses already set in importOkvisData
+//    Mat3 R, R2;
+//    Vec3 t, t2;
+//    if (b_fix_pose){ //use data saved in prior
+//        R = view_pose_prior->pose_rotation_;
+//        t = -( R * view_pose_prior->pose_center_ );
 
-        // for debugging
-        const Pose3 & pose = pose_it.second;
-        R2 = pose.rotation();
-        t2 = pose.translation();
+//        // for debugging
+//        const Pose3 & pose = pose_it.second;
+//        R2 = pose.rotation();
+//        t2 = pose.translation();
 
-        {
-          using namespace std;
-          cout << "R" << endl << R << endl << endl << "R2" << endl << R2 << endl << endl;
-          cout << "t" << endl << t << endl << endl << "t2" << endl << t2 << endl;
-          cout << endl;
-        }
-      } else {
-        // use data calculated in steps before (rel Rot, glob Rot, transl.)
-        // in case data poses are given, it is overwritten by identical data
-        // TODO: check and improve
-        const Pose3 & pose = pose_it.second;
-        R = pose.rotation();
-        t = pose.translation();
-      }
+//        {
+//          using namespace std;
+//          cout << "R" << endl << R << endl << endl << "R2" << endl << R2 << endl << endl;
+//          cout << "t" << endl << t << endl << endl << "t2" << endl << t2 << endl;
+//          cout << endl;
+//        }
+//      } else {
+//        // use data calculated in steps before (rel Rot, glob Rot, transl.)
+//        // in case data poses are given, it is overwritten by identical data
+//        // TODO: check and improve
+//        const Pose3 & pose = pose_it.second;
+//        R = pose.rotation();
+//        t = pose.translation();
+//      }
 
+    const Pose3 & pose = pose_it.second;
+    Mat3 R = pose.rotation();
+    Vec3 t = pose.translation();
 
     double angleAxis[3];
     ceres::RotationMatrixToAngleAxis((const double*)R.data(), angleAxis);
@@ -285,7 +289,7 @@ bool Bundle_Adjustment_Ceres::Adjust
     problem.AddParameterBlock(parameter_block, 6);
 
 
-
+    //fix pose here
     if ((options.extrinsics_opt == Extrinsic_Parameter_Type::NONE) || b_fix_pose)
     {
       // set the whole parameter block as constant for best performance
@@ -460,11 +464,12 @@ bool Bundle_Adjustment_Ceres::Adjust
   ceres_config_options.minimizer_progress_to_stdout = ceres_options_.bVerbose_;
   ceres_config_options.logging_type = ceres::SILENT;
   ceres_config_options.num_threads = ceres_options_.nb_threads_;
+//  std::cout << "nb_threads " << ceres_options_.nb_threads_ << std::endl;
   ceres_config_options.num_linear_solver_threads = ceres_options_.nb_threads_;
   ceres_config_options.parameter_tolerance = ceres_options_.parameter_tolerance_;
 //  //rm
 //  ceres_config_options.parameter_tolerance = 1e-10;
-//  ceres_config_options.function_tolerance = 1e-10;
+  ceres_config_options.function_tolerance = 1e-10; //|cost_change|/cost
 //  //end rm
 
   // Solve BA

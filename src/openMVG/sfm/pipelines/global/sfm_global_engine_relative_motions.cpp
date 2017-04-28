@@ -471,27 +471,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 
   //filter out lm only connected to fixed poses
 
-  auto it = sfm_data_.structure.begin();
-  do{
-      bool b_has_flex_pose = false;
-      cout << "lm " << it->first << endl;
-      for (auto itO = it->second.obs.begin(); itO != it->second.obs.end(); itO++){
-          const sfm::ViewPriors * view_pose_prior = dynamic_cast<sfm::ViewPriors*>(sfm_data_.views.at(itO->first).get());
-          bool b_fix = false;
-          if (view_pose_prior != nullptr){
-              b_fix = view_pose_prior->b_fix_pose_;
-            }
-          cout << "obs " << itO->first << endl;
-          b_has_flex_pose |= !b_fix;
-        }
-      if (b_has_flex_pose){
-          it++;
-          cout << "ok" << endl;
-      } else {
-          it = sfm_data_.structure.erase(it);
-          cout << "deleted" << endl;
-        }
-    } while (it != sfm_data_.structure.end());
+
 
   if (!Adjust())
   {
@@ -686,7 +666,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
     // Use triplet validated matches
     tracksBuilder.Build(tripletWise_matches);
 #endif
-    tracksBuilder.Filter(); //Filter(3);
+    tracksBuilder.Filter(3); //Filter(3);
     STLMAPTracks map_selectedTracks; // reconstructed track (visibility per 3D point)
     tracksBuilder.ExportToSTL(map_selectedTracks);
 
@@ -842,14 +822,18 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 
   // Remove outliers (max_angle, residual error)
   const size_t pointcount_initial = sfm_data_.structure.size();
-  RemoveOutliers_PixelResidualError(sfm_data_, 4.0); //4.0rm
+  double dThresholdPixel = 1.5;
+  RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel); //4.0rm
   const size_t pointcount_pixelresidual_filter = sfm_data_.structure.size();
-  RemoveOutliers_AngleError(sfm_data_, 2.0); //2.0, reconstruction fails with 1.5
+  double dMinAcceptedAngle = 0.5;
+  RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle); //2.0, reconstruction fails with 1.5
 //  std::cout << "3, 2.0" << std::endl;
   const size_t pointcount_angular_filter = sfm_data_.structure.size();
   std::cout << "Outlier removal (remaining #points):\n"
     << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
+    << "\t Threshold Pixel: " << dThresholdPixel << "\n"
     << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
+    << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
     << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
 
   if (!sLogging_file_.empty())
