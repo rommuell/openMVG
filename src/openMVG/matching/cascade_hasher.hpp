@@ -297,7 +297,7 @@ public:
     const int NN = 2,
     const int I = -1,
     const int J = -1,
-    std::shared_ptr<features::Regions> regionsI =nullptr,
+    std::shared_ptr<features::Regions> regionsI = nullptr,
     std::shared_ptr<features::Regions> regionsJ = nullptr
   ) const
   {
@@ -327,10 +327,12 @@ public:
     std::vector<bool> used_descriptor(hashed_descriptions2.hashed_desc.size());
 
     //rm
-    if (sfm_data == nullptr){
-        std::cout << "error in sfm data (nullptr)" << std::endl;
+    if (sfm_data == nullptr || I == -1 || J == -1 || regionsI == nullptr || regionsJ == nullptr){
+        std::cout << "error in sfm data (nullptr), invalid input" << std::endl;
         return;
       }
+    int nb_reg_I = regionsI->RegionCount();
+    int nb_reg_J = regionsJ->RegionCount();
 
     geometry::Pose3 T = sfm_data->poses.at(I).inverse() * sfm_data->poses.at(J);
     Mat3 R = T.rotation();
@@ -355,9 +357,14 @@ public:
 
       const auto& hashed_desc = hashed_descriptions1.hashed_desc[i];
 
-//      Vec2 feat_pos = cam->get_ud_pixel(regionsI->GetRegionPosition(i));
+      if (i >= nb_reg_I){ //sometimes ids which don't exist appear
+          continue;
+        }
+
       Vec3 x2;
-      x2 << regionsI->GetRegionPosition(i), 1.0;
+//      x2 << regionsI->GetRegionPosition(i), 1.0;
+//      std::cout << std::to_string(J) + " " + std::to_string(i) + "\n" << std::endl;
+      x2 << cam->get_ud_pixel(regionsI->GetRegionPosition(i)), 1.0;
       Vec3 x2p = K * R * K.inverse() * x2;
       x2p[0] = x2p[0] / x2p[2]; x2p[1] = x2p[1] / x2p[2]; x2p[2] = 1.0;
 //      std::cout << "x2p" << std::endl << x2p << std::endl;
@@ -369,15 +376,22 @@ public:
         const uint16_t bucket_id = hashed_desc.bucket_ids[j];
         for (const auto& feature_id : hashed_descriptions2.buckets[j][bucket_id])
         {
-//          Vec2 x = cam->get_ud_pixel(regionsJ->GetRegionPosition(feature_id));
-          Vec2 x = regionsJ->GetRegionPosition(feature_id);
+          if (feature_id >= nb_reg_J){ //sometimes ids which don't exist appear
+              continue;
+            }
+
+//          Vec2 x_d = regionsJ->GetRegionPosition(feature_id);
+//          std::string out = std::to_string(J) + "," + std::to_string(feature_id) + " " + std::to_string(x_d[0]) + "," + std::to_string(x_d[1]) + "\n";
+//          std::cout << out << std::endl;
+          Vec2 x = cam->get_ud_pixel(regionsJ->GetRegionPosition(feature_id));
+//          Vec2 x = regionsJ->GetRegionPosition(feature_id);
 //          std::cout << "x" << std::endl << x << std::endl;
           double distance = 100.0;
           double num = (x2p[1] - e2[1]) * x[0] - (x2p[0] - e2[0]) * x[1] + x2p[0] * e2[1] - x2p[1] * e2[1];
           num = num * num;
           double denum = (x2p[1] - e2[1]) * (x2p[1] - e2[1]) + (x2p[0] - e2[0]) * (x2p[0] - e2[0]);
 //          std::cout << "num/denum " << num/denum << std::endl;
-          if (num / denum > distance * distance){
+          if (num / denum > distance * distance && true){
             continue;
           }
 
