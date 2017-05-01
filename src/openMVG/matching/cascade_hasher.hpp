@@ -327,44 +327,22 @@ public:
     std::vector<bool> used_descriptor(hashed_descriptions2.hashed_desc.size());
 
     //rm
-//    if (sfm_data != nullptr && I != -1 && J != -1){
-//      geometry::Pose3 T = sfm_data->poses.at(J).inverse() * sfm_data->poses.at(J);
-//      Mat3 R = T.rotation();
-//      Vec3 t = T.translation();
-//      Mat3 tx;
-//      tx << 0.0, -t[2], t[1], t[2], 0.0, -t[0], -t[1], t[0], 0.0;
-      const openMVG::cameras::IntrinsicBase * cam = sfm_data->GetIntrinsics().at(0).get();
-//      std::vector<double> params = cam->getParams();//focal, ppx, ppy
-//      Mat3 K;
-//      K << 1.0/params[0], 0.0, params[1], 0.0, 1/params[0], params[2], 0.0, 0.0, 1.0;
+    if (sfm_data == nullptr){
+        std::cout << "error in sfm data (nullptr)" << std::endl;
+        return;
+      }
 
-//      Mat3 F = K.inverse().transpose() * tx * R * K.inverse();
+    geometry::Pose3 T = sfm_data->poses.at(I).inverse() * sfm_data->poses.at(J);
+    Mat3 R = T.rotation();
+    Vec3 t = T.translation();
+    const openMVG::cameras::IntrinsicBase * cam = sfm_data->GetIntrinsics().at(0).get();
+    std::vector<double> params = cam->getParams();//focal, ppx, ppy
+    Mat3 K;
+    K << params[0], 0.0, params[1], 0.0, params[0], params[2], 0.0, 0.0, 1.0;
+    Vec3 e2 = K * t;
 
-//      std::cout << t << std::endl << tx << std::endl;
-//      std::cout << std::endl;
-
-
-
-      // option 2
-      Eigen::MatrixXd P1 = cam->get_projective_equivalent(sfm_data->poses.at(I));
-      Eigen::MatrixXd P2 = cam->get_projective_equivalent(sfm_data->poses.at(J));
-      Eigen::MatrixXd P1_inv = pseudoinverse(P1);
-     std::cout << "P1" << std::endl << P1 << std::endl << std::endl;
-     std::cout << "P1inv" << std::endl << P1_inv << std::endl << std::endl;
-
-      Eigen::VectorXd C(4);
-      Vec3 c = sfm_data->poses.at(I).center();
-      C << c, 1.0;
-      Vec3 e2 = P2 * C;
-//      Ve3 P2C = e2;
-//      Mat3 P2Cx;
-//      P2Cx << 0.0, -P2C[2], P2C[1], P2C[2], 0.0, -P2C[0], -P2C[1], P2C[0], 0.0;
-//      Mat3 F2 = P2Cx * P2 *P1_inv;
-      e2[0] = e2[0] / e2[2]; e2[1] = e2[1] / e2[2]; e2[2] = 1.0;
-      std::cout << "e2" << std::endl << e2 << std::endl;
-
-
-//    }
+    e2[0] = e2[0] / e2[2]; e2[1] = e2[1] / e2[2]; e2[2] = 1.0;
+//    std::cout << "e2" << std::endl << e2 << std::endl;
     //rm
 
     using HammingMetricType = matching::Hamming<stl::dynamic_bitset::BlockType>;
@@ -377,12 +355,13 @@ public:
 
       const auto& hashed_desc = hashed_descriptions1.hashed_desc[i];
 
-      Vec2 feat_pos = cam->get_ud_pixel(regionsI->GetRegionPosition(i));
+//      Vec2 feat_pos = cam->get_ud_pixel(regionsI->GetRegionPosition(i));
       Vec3 x2;
-      x2 << feat_pos, 1.0;
-      Vec3 x2p = P2 * P1_inv * x2;
+      x2 << regionsI->GetRegionPosition(i), 1.0;
+      Vec3 x2p = K * R * K.inverse() * x2;
       x2p[0] = x2p[0] / x2p[2]; x2p[1] = x2p[1] / x2p[2]; x2p[2] = 1.0;
-      std::cout << "x2p" << std::endl << x2p << std::endl;
+//      std::cout << "x2p" << std::endl << x2p << std::endl;
+
       // Accumulate all descriptors in each bucket group that are in the same
       // bucket id as the query descriptor.
       for (int j = 0; j < nb_bucket_groups_; ++j)
@@ -390,27 +369,24 @@ public:
         const uint16_t bucket_id = hashed_desc.bucket_ids[j];
         for (const auto& feature_id : hashed_descriptions2.buckets[j][bucket_id])
         {
-          //include constraint here
-//          if (sfm_data != nullptr && I != -1 && J != -1 && regionsI != nullptr && regionsJ != nullptr){
-          Vec2 x = cam->get_ud_pixel(regionsJ->GetRegionPosition(feature_id));
-                std::cout << "x" << std::endl << x << std::endl;
-          double distance = 20.0;
+//          Vec2 x = cam->get_ud_pixel(regionsJ->GetRegionPosition(feature_id));
+          Vec2 x = regionsJ->GetRegionPosition(feature_id);
+//          std::cout << "x" << std::endl << x << std::endl;
+          double distance = 100.0;
           double num = (x2p[1] - e2[1]) * x[0] - (x2p[0] - e2[0]) * x[1] + x2p[0] * e2[1] - x2p[1] * e2[1];
+          num = num * num;
           double denum = (x2p[1] - e2[1]) * (x2p[1] - e2[1]) + (x2p[0] - e2[0]) * (x2p[0] - e2[0]);
-          std::cout << "num/denum " << num/denum << std::endl;
-            if (num / denum > distance * distance){
-              continue;
-            }
+//          std::cout << "num/denum " << num/denum << std::endl;
+          if (num / denum > distance * distance){
+            continue;
+          }
 
-//            std::cout << feature_id << std::endl;
-            candidate_descriptors.emplace_back(feature_id);
-            used_descriptor[feature_id] = false;
-
-//          }
+          candidate_descriptors.emplace_back(feature_id);
+          used_descriptor[feature_id] = false;
         }
       }
 
-      std::cout << "cascade hasher candidates (): " << candidate_descriptors.size() << std::endl;
+//      std::cout << "cascade hasher candidates (): " << candidate_descriptors.size() << std::endl;
 
       // Skip matching this descriptor if there are not at least NN candidates.
       if (candidate_descriptors.size() <= NN)
