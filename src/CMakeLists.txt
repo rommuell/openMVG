@@ -20,11 +20,11 @@ endif()
 option(OpenMVG_BUILD_SHARED "Build OpenMVG shared libs" OFF)
 option(OpenMVG_BUILD_TESTS "Build OpenMVG tests" OFF)
 option(OpenMVG_BUILD_DOC "Build OpenMVG documentation" ON)
-option(OpenMVG_BUILD_EXAMPLES "Build OpenMVG samples applications." ON)
+option(OpenMVG_BUILD_EXAMPLES "Build OpenMVG samples applications." OFF)
 option(OpenMVG_BUILD_OPENGL_EXAMPLES "Build OpenMVG openGL examples" OFF)
 option(OpenMVG_BUILD_SOFTWARES "Build OpenMVG softwares" ON)
 option(OpenMVG_BUILD_COVERAGE "Enable code coverage generation (gcc only)" OFF)
-option(OpenMVG_USE_OPENMP "Enable OpenMP parallelization" ON)
+option(OpenMVG_USE_OPENMP "Enable OpenMP parallelization" OFF)
 # ==============================================================================
 # Opencv is not used by openMVG but some samples show how to use openCV
 #  and openMVG simultaneously
@@ -53,7 +53,7 @@ set(OPENMVG_VERSION ${OPENMVG_VERSION_MAJOR}.${OPENMVG_VERSION_MINOR}.${OPENMVG_
 
 # Default build is in Release mode
 if (NOT CMAKE_BUILD_TYPE AND NOT MSVC)
-  set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_BUILD_TYPE "Debug")
 endif (NOT CMAKE_BUILD_TYPE AND NOT MSVC)
 
 # Set build path
@@ -142,6 +142,7 @@ if (OpenMVG_USE_OPENMP)
   endif (OPENMP_FOUND)
 else (OpenMVG_USE_OPENMP)
     option(OpenMVG_USE_OPENMP "Use OpenMP for parallelization" OFF)
+    include(UpdateCacheVariable)
     UPDATE_CACHE_VARIABLE(OpenMVG_USE_OPENMP OFF)
     remove_definitions(-DOPENMVG_USE_OPENMP)
 endif (OpenMVG_USE_OPENMP)

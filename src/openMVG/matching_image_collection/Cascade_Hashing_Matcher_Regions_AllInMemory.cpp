@@ -121,7 +121,7 @@ void Match
   }
 
   // Perform matching between all the pairs
-  for (Map_vectorT::const_iterator iter = map_Pairs.begin();
+  for (Map_vectorT::const_iterator iter = map_Pairs.begin(); //outer Loop (I)
     iter != map_Pairs.end(); ++iter)
   {
     const IndexT I = iter->first;
@@ -143,7 +143,7 @@ void Match
 #ifdef OPENMVG_USE_OPENMP
     #pragma omp parallel for schedule(dynamic)
 #endif
-    for (int j = 0; j < (int)indexToCompare.size(); ++j)
+    for (int j = 0; j < (int)indexToCompare.size(); ++j)  //inner Loop (J)
     {
       size_t J = indexToCompare[j];
       std::shared_ptr<features::Regions> regionsJ = regions_provider.get(J);
@@ -171,7 +171,8 @@ void Match
       cascade_hasher.Match_HashedDescriptions<BaseMat, ResultType>(
         hashed_base_[J], mat_J,
         hashed_base_[I], mat_I,
-        &pvec_indices, &pvec_distances);
+        &pvec_indices, &pvec_distances, &sfm_data,
+        2, I, J, regionsI, regionsJ);
 
       std::vector<int> vec_nn_ratio_idx;
       // Filter the matches using a distance ratio test:

@@ -126,7 +126,7 @@ class ArrayMatcherCascadeHashing  : public ArrayMatcher<Scalar, Metric>
     cascade_hasher_.Match_HashedDescriptions(
       hashed_query, mat_query,
       hashed_base_, *memMapping,
-      pvec_indices, pvec_distances,
+      pvec_indices, pvec_distances, nullptr,
       NN);
 
     return true;

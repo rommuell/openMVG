@@ -51,7 +51,7 @@ void Matcher_Regions_AllInMemory::Match(
   }
 
   // Perform matching between all the pairs
-  for (Map_vectorT::const_iterator iter = map_Pairs.begin();
+  for (Map_vectorT::const_iterator iter = map_Pairs.begin(); //outer loop (I)
     iter != map_Pairs.end(); ++iter)
   {
     const size_t I = iter->first;
@@ -70,7 +70,7 @@ void Matcher_Regions_AllInMemory::Match(
 #ifdef OPENMVG_USE_OPENMP
     #pragma omp parallel for schedule(dynamic) if(b_multithreaded_pair_search)
 #endif
-    for (int j = 0; j < (int)indexToCompare.size(); ++j)
+    for (int j = 0; j < (int)indexToCompare.size(); ++j) //inner loop (J)
     {
       const size_t J = indexToCompare[j];
 
