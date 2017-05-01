@@ -334,9 +334,22 @@ public:
     int nb_reg_I = regionsI->RegionCount();
     int nb_reg_J = regionsJ->RegionCount();
 
-    geometry::Pose3 T = sfm_data->poses.at(I).inverse() * sfm_data->poses.at(J);
+    geometry::Pose3 T = sfm_data->poses.at(J).inverse() * sfm_data->poses.at(I);
+    //openMVG  P.rotation_.transpose() * center_ + P.center_, rotation_ * P.rotation_,
+    //okvis : C_ * rhs.r_ + r_, q_ * rhs.q_
+    //  r_ = r_AB; C_ from q_AB
+    // C_ = rotation_
+    // r_ = center_
+
     Mat3 R = T.rotation();
     Vec3 t = T.translation();
+
+    std::stringstream ss;
+    ss << I << sfm_data->views.at(I)->s_Img_path << " " << J << sfm_data->views.at(J)->s_Img_path << "\n"
+              << "R" << "\n" << R << "\n"
+              << "t" << "\n" << t<< "\n";
+    std::cout << ss.str() << std::endl;
+
     const openMVG::cameras::IntrinsicBase * cam = sfm_data->GetIntrinsics().at(0).get();
     std::vector<double> params = cam->getParams();//focal, ppx, ppy
     Mat3 K;
