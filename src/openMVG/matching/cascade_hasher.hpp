@@ -334,21 +334,53 @@ public:
     int nb_reg_I = regionsI->RegionCount();
     int nb_reg_J = regionsJ->RegionCount();
 
-    geometry::Pose3 T = sfm_data->poses.at(J).inverse() * sfm_data->poses.at(I);
+//    if (I == 0 && J == 1){
+//        geometry::Pose3 P1 = sfm_data->poses.at(I);
+//        Mat3 R1 = P1.rotation();
+//        Vec3 t1 = P1.translation();
+//        Vec3 c1 = P1.center();
+
+//        geometry::Pose3 P2 = sfm_data->poses.at(J);
+//        Mat3 R2 = P2.rotation();
+//        Vec3 t2 = P2.translation();
+//        Vec3 c2 = P2.center();
+
+//        std::stringstream stream;
+//        stream << I << "\n"
+//               << "R" << "\n" << R1 << "\n"
+//               << "t" << "\n" << t1 << "\n"
+//               << "c" << "\n" << c1 << "\n";
+
+//        stream << J << "\n"
+//               << "R" << "\n" << R2 << "\n"
+//               << "t" << "\n" << t2 << "\n"
+//               << "c" << "\n" << c2 << "\n";
+
+//        std::cout << stream.str() << std::endl;
+//      }
+
+//    geometry::Pose3 T = sfm_data->poses.at(J).inverse() * sfm_data->poses.at(I);
+
+    Mat3 R1_inv = sfm_data->poses.at(I).rotation().transpose();
+    Vec3 c1 = sfm_data->poses.at(I).center();
+    Mat3 R2 = sfm_data->poses.at(J).rotation();
+    Vec3 c2 = sfm_data->poses.at(J).center();
     //openMVG  P.rotation_.transpose() * center_ + P.center_, rotation_ * P.rotation_,
     //okvis : C_ * rhs.r_ + r_, q_ * rhs.q_
     //  r_ = r_AB; C_ from q_AB
     // C_ = rotation_
     // r_ = center_
 
-    Mat3 R = T.rotation();
-    Vec3 t = T.translation();
+    Mat3 R = R2 * R1_inv;
+    Vec3 t = R2 * (c1 - c2);
 
-    std::stringstream ss;
-    ss << I << sfm_data->views.at(I)->s_Img_path << " " << J << sfm_data->views.at(J)->s_Img_path << "\n"
-              << "R" << "\n" << R << "\n"
-              << "t" << "\n" << t<< "\n";
-    std::cout << ss.str() << std::endl;
+    if (I == 0 && J == 1){
+      std::stringstream ss;
+      ss << I << sfm_data->views.at(I)->s_Img_path << " " << J << sfm_data->views.at(J)->s_Img_path << "\n"
+                << "R" << "\n" << R << "\n"
+                << "t" << "\n" << t<< "\n";
+      std::cout << ss.str() << std::endl;
+    }
 
     const openMVG::cameras::IntrinsicBase * cam = sfm_data->GetIntrinsics().at(0).get();
     std::vector<double> params = cam->getParams();//focal, ppx, ppy
@@ -400,11 +432,11 @@ public:
 //          Vec2 x = regionsJ->GetRegionPosition(feature_id);
 //          std::cout << "x" << std::endl << x << std::endl;
           double distance = 100.0;
-          double num = (x2p[1] - e2[1]) * x[0] - (x2p[0] - e2[0]) * x[1] + x2p[0] * e2[1] - x2p[1] * e2[1];
+          double num = (x2p[1] - e2[1]) * x[0] - (x2p[0] - e2[0]) * x[1] + x2p[0] * e2[1] - x2p[1] * e2[0];
           num = num * num;
           double denum = (x2p[1] - e2[1]) * (x2p[1] - e2[1]) + (x2p[0] - e2[0]) * (x2p[0] - e2[0]);
 //          std::cout << "num/denum " << num/denum << std::endl;
-          if (num / denum > distance * distance && true){
+          if (num / denum > distance * distance && false){
             continue;
           }
 
