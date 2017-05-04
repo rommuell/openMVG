@@ -211,27 +211,33 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //    std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
 //    return false;
 //  }
-  Hash_Map<IndexT, Mat3> global_rotations;
-  int i = 0;
-  for (auto it = sfm_data_.poses.begin(); it != sfm_data_.poses.end(); it++, i++){
-      global_rotations.emplace(make_pair(i, it->second.rotation()));
+//          Hash_Map<IndexT, Mat3> global_rotations;
+//          int i = 0;
+//          for (auto it = sfm_data_.poses.begin(); it != sfm_data_.poses.end(); it++, i++){
+//              global_rotations.emplace(make_pair(i, it->second.rotation()));
+//            }
+//          auto poses_bkp = sfm_data_.poses;
+//          matching::PairWiseMatches  tripletWise_matches;
+//          if (!Compute_Global_Translations(global_rotations, tripletWise_matches))
+//          {
+//            std::cerr << "GlobalSfM:: Translation Averaging failure!" << std::endl;
+//            return false;
+//          }
+//          sfm_data_.poses = poses_bkp;
+//          if (!Compute_Initial_Structure(tripletWise_matches))
+//          {
+//            std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
+//            return false;
+//          }
+//  Save(sfm_data_,
+//    "/home/rm/Desktop/test.ply",
+//    ESfM_Data(ALL));
+    if (!Compute_Initial_Structure(matches_provider_->pairWise_matches_))
+//    if (!Compute_Initial_Structure(tripletWise_matches))
+    {
+      std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
+      return false;
     }
-  auto poses_bkp = sfm_data_.poses;
-  matching::PairWiseMatches  tripletWise_matches;
-  if (!Compute_Global_Translations(global_rotations, tripletWise_matches))
-  {
-    std::cerr << "GlobalSfM:: Translation Averaging failure!" << std::endl;
-    return false;
-  }
-  sfm_data_.poses = poses_bkp;
-  if (!Compute_Initial_Structure(tripletWise_matches))
-  {
-    std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
-    return false;
-  }
-  Save(sfm_data_,
-    "/home/rm/Desktop/test.ply",
-    ESfM_Data(ALL));
 
 
 //                              using namespace openMVG::matching;
@@ -469,8 +475,26 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
   sfm_data_.structure.insert(structure_okvis_bkp.begin(), structure_okvis_bkp.end());
 //  sfm_data_.structure = structure_okvis_bkp; // uncomment this line for only okvis structure
 
-  //filter out lm only connected to fixed poses
+  //filter out lm only connected to fixed poses (needed for new landmarks)
+  // same code as OpenMVG::FilterFixFix()
 
+  auto it = sfm_data_.structure.begin();
+  do{
+      bool b_has_flex_pose = false;
+      for (auto itO = it->second.obs.begin(); itO != it->second.obs.end(); itO++){
+          const sfm::ViewPriors * view_pose_prior = dynamic_cast<sfm::ViewPriors*>(sfm_data_.views.at(itO->first).get());
+          bool b_fix = false;
+          if (view_pose_prior != nullptr){
+              b_fix = view_pose_prior->b_fix_pose_;
+            }
+          b_has_flex_pose |= !b_fix;
+        }
+      if (b_has_flex_pose){
+          it++;
+      } else {
+          it = sfm_data_.structure.erase(it);
+        }
+    } while (it != sfm_data_.structure.end());
 
 
   if (!Adjust())
@@ -758,8 +782,11 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
-  // Refine sfm_scene (in a 3 iteration process (free the parameters regarding their incertainty order)):
+  // filter on input data
+  RemoveOutliers_PixelResidualError(sfm_data_, 6.0); //4.0rm
+  RemoveOutliers_AngleError(sfm_data_, 3.0);
 
+  // Refine sfm_scene (in a 3 iteration process (free the parameters regarding their incertainty order)):
   Bundle_Adjustment_Ceres bundle_adjustment_obj;
   // - refine only Structure and translations
   bool b_BA_Status = bundle_adjustment_obj.Adjust
@@ -779,6 +806,10 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
       Save(sfm_data_,
         stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_00_refine_T_Xi", "ply"),
         ESfM_Data(EXTRINSICS | STRUCTURE));
+
+      std::cout << "...Generating intermediate SfM_Report.html" << std::endl;
+      Generate_SfM_Report(sfm_data_,
+        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "SfMReconstruction_Report_after_T_Xi.html"));
     }
 
     // - refine only Structure and Rotations & translations
@@ -822,10 +853,10 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 
   // Remove outliers (max_angle, residual error)
   const size_t pointcount_initial = sfm_data_.structure.size();
-  double dThresholdPixel = 1.5;
+  double dThresholdPixel = 3.0; //1.5
   RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel); //4.0rm
   const size_t pointcount_pixelresidual_filter = sfm_data_.structure.size();
-  double dMinAcceptedAngle = 0.5;
+  double dMinAcceptedAngle = 1.0; //0.5
   RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle); //2.0, reconstruction fails with 1.5
 //  std::cout << "3, 2.0" << std::endl;
   const size_t pointcount_angular_filter = sfm_data_.structure.size();
