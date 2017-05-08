@@ -371,6 +371,13 @@ bool Bundle_Adjustment_Ceres::Adjust
   {
     const Observations & obs = structure_landmark_it.second.obs;
 
+    double weight = 0.0;
+    if (structure_landmark_it.second.b_external){
+        weight = 1.0;
+      } else {
+        weight = 2.0;
+      }
+
     for (const auto & obs_it : obs)
     {
       // Build the residual block corresponding to the track observation:
@@ -380,7 +387,7 @@ bool Bundle_Adjustment_Ceres::Adjust
       // dimensional residual. Internally, the cost function stores the observed
       // image location and compares the reprojection against the observation.
       ceres::CostFunction* cost_function =
-        IntrinsicsToCostFunction(sfm_data.intrinsics[view->id_intrinsic].get(), obs_it.second.x);
+        IntrinsicsToCostFunction(sfm_data.intrinsics[view->id_intrinsic].get(), obs_it.second.x, weight);
 
       if (cost_function)
         problem.AddResidualBlock(cost_function,
