@@ -372,11 +372,11 @@ bool Bundle_Adjustment_Ceres::Adjust
     const Observations & obs = structure_landmark_it.second.obs;
 
     double weight = 0.0;
-    if (structure_landmark_it.second.b_external){
-        weight = 1.0;
-      } else {
-        weight = 2.0;
-      }
+//    if (structure_landmark_it.second.b_external){
+//        weight = 1.0;
+//      } else {
+//        weight = 2.0;
+//      }
 
     for (const auto & obs_it : obs)
     {
