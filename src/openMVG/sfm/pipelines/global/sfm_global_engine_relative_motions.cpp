@@ -694,6 +694,16 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
     STLMAPTracks map_selectedTracks; // reconstructed track (visibility per 3D point)
     tracksBuilder.ExportToSTL(map_selectedTracks);
 
+
+    map<IndexT, map<IndexT, double> > ratio_provider;
+
+    for (auto it_pair = tripletWise_matches.begin(); it_pair != tripletWise_matches.end(); it_pair++){
+        IndexT img_ind = it_pair->first.second;
+        for (auto it_m = it_pair->second.begin(); it_m != it_pair->second.end(); it_m++){
+            ratio_provider[img_ind].emplace(it_m->j_, it_m->ratio_);
+          }
+      }
+
     // Fill sfm_data with the computed tracks (no 3D yet)
     Landmarks & structure = sfm_data_.structure;
     IndexT idx(0);
@@ -709,7 +719,8 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
         const size_t imaIndex = it->first;
         const size_t featIndex = it->second;
         const PointFeature & pt = features_provider_->feats_per_view.at(imaIndex)[featIndex];
-        obs[imaIndex] = Observation(pt.coords().cast<double>(), featIndex);
+        double ratio = ratio_provider.at(imaIndex)[featIndex];
+        obs[imaIndex] = Observation(pt.coords().cast<double>(), featIndex, ratio);
       }
     }
 

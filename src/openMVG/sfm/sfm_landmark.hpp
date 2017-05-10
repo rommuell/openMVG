@@ -18,10 +18,11 @@ namespace sfm {
 struct Observation
 {
   Observation():id_feat(UndefinedIndexT) {  }
-  Observation(const Vec2 & p, IndexT idFeat): x(p), id_feat(idFeat) {}
+  Observation(const Vec2 & p, IndexT idFeat, double ratio = 0.0): x(p), id_feat(idFeat), ratio(ratio) {}
 
   Vec2 x;
   IndexT id_feat;
+  double ratio;
 
   // Serialization
   template <class Archive>
@@ -30,6 +31,7 @@ struct Observation
     ar(cereal::make_nvp("id_feat", id_feat ));
     const std::vector<double> pp = { x(0), x(1) };
     ar(cereal::make_nvp("x", pp));
+    ar(cereal::make_nvp("ratio", ratio ));
   }
 
   // Serialization
@@ -40,6 +42,7 @@ struct Observation
     std::vector<double> p(2);
     ar(cereal::make_nvp("x", p));
     x = Eigen::Map<const Vec2>(&p[0]);
+    ar(cereal::make_nvp("ratio", ratio ));
   }
 };
 /// Observations are indexed by their View_id

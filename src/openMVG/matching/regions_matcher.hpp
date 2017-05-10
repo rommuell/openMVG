@@ -168,7 +168,8 @@ public:
     vec_putative_matches.reserve(vec_nn_ratio_idx.size());
     for ( const auto & index : vec_nn_ratio_idx )
     {
-      vec_putative_matches.emplace_back(vec_nIndice[index*NNN__].j_, vec_nIndice[index*NNN__].i_);
+      double ratio = vec_fDistance[index*NNN__] / vec_fDistance[index*NNN__ + 1];
+      vec_putative_matches.emplace_back(vec_nIndice[index*NNN__].j_, vec_nIndice[index*NNN__].i_, ratio);
     }
 
     // Remove duplicates

@@ -24,7 +24,7 @@ namespace matching {
 /// A sort operator exist in order to remove duplicates of IndMatch series.
 struct IndMatch
 {
-  IndMatch(IndexT i = 0, IndexT j = 0) : i_(i), j_(j)  {}
+  IndMatch(IndexT i = 0, IndexT j = 0, double ratio = -1.0) : i_(i), j_(j), ratio_(ratio)  {}
 
   friend bool operator==(const IndMatch& m1, const IndMatch& m2)  {
     return (m1.i_ == m2.i_ && m1.j_ == m2.j_);
@@ -51,18 +51,19 @@ struct IndMatch
   // Serialization
   template <class Archive>
   void serialize( Archive & ar )  {
-    ar(i_, j_);
+    ar(i_, j_, ratio_);
   }
 
   IndexT i_, j_;  // Left, right index
+  double ratio_;
 };
 
 inline std::ostream& operator<<(std::ostream & out, const IndMatch & obj) {
-  return out << obj.i_ << " " << obj.j_;
+  return out << obj.i_ << " " << obj.j_ << " " << obj.ratio_;
 }
 
 inline std::istream& operator>>(std::istream & in, IndMatch & obj) {
-  return in >> obj.i_ >> obj.j_;
+  return in >> obj.i_ >> obj.j_ >> obj.ratio_;
 }
 
 using IndMatches = std::vector<matching::IndMatch>;
