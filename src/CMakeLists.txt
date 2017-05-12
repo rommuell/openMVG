@@ -53,7 +53,7 @@ set(OPENMVG_VERSION ${OPENMVG_VERSION_MAJOR}.${OPENMVG_VERSION_MINOR}.${OPENMVG_
 
 # Default build is in Release mode
 if (NOT CMAKE_BUILD_TYPE AND NOT MSVC)
-  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+  set(CMAKE_BUILD_TYPE "Release")
 endif (NOT CMAKE_BUILD_TYPE AND NOT MSVC)
 
 # Set build path

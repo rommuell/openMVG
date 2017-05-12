@@ -126,16 +126,16 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
     return false;
   }
 
-  //rm
-  ofstream TwmFile(sfm_data_.s_root_path + "/tripletWiseMatches.txt");
-  for (auto it = tripletWise_matches.begin(); it != tripletWise_matches.end(); it++){
-      TwmFile << it->first.first << " " << it->first.second << std::endl;
-      TwmFile << it->second.size() << endl;
-      for (auto it2 = it->second.begin(); it2 != it->second.end(); it2++){
-          TwmFile << it2->i_ << " " << it2->j_ << std::endl;
-        }
-    }
-  TwmFile.close();
+//  //rm
+//  ofstream TwmFile(sfm_data_.s_root_path + "/tripletWiseMatches.txt");
+//  for (auto it = tripletWise_matches.begin(); it != tripletWise_matches.end(); it++){
+//      TwmFile << it->first.first << " " << it->first.second << std::endl;
+//      TwmFile << it->second.size() << endl;
+//      for (auto it2 = it->second.begin(); it2 != it->second.end(); it2++){
+//          TwmFile << it2->i_ << " " << it2->j_ << std::endl;
+//        }
+//    }
+//  TwmFile.close();
 
   if (!Compute_Initial_Structure(tripletWise_matches))
   {
@@ -708,7 +708,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
       {
         const size_t imaIndex = it->first;
         const size_t featIndex = it->second;
-        const PointFeature & pt = features_provider_->feats_per_view.at(imaIndex)[featIndex];
+        const PointFeature & pt = features_provider_->feats_per_view.at(imaIndex).at(featIndex);
         obs[imaIndex] = Observation(pt.coords().cast<double>(), featIndex);
       }
     }
@@ -782,9 +782,29 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
-  // filter on input data
-  RemoveOutliers_PixelResidualError(sfm_data_, 6.0); //4.0rm
-  RemoveOutliers_AngleError(sfm_data_, 3.0);
+
+  size_t pointcount_initial = 0;
+  double dThresholdPixel = 0;
+  size_t pointcount_pixelresidual_filter = 0;
+  double dMinAcceptedAngle = 0;
+  size_t pointcount_angular_filter = 0;
+
+//  // filter on input data
+//  // Remove outliers (max_angle, residual error)
+//  size_t pointcount_initial = sfm_data_.structure.size();
+//  double dThresholdPixel = 6.0; //6
+//  RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
+//  size_t pointcount_pixelresidual_filter = sfm_data_.structure.size();
+//  double dMinAcceptedAngle = 3.0; //3.0
+//  RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle);
+//  std::cout << "3, 2.0" << std::endl;
+//  size_t pointcount_angular_filter = sfm_data_.structure.size();
+//  std::cout << "input outlier removal (remaining #points):\n"
+//    << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
+//    << "\t Threshold Pixel: " << dThresholdPixel << "\n"
+//    << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
+//    << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
+//    << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
 
   // Refine sfm_scene (in a 3 iteration process (free the parameters regarding their incertainty order)):
   Bundle_Adjustment_Ceres bundle_adjustment_obj;
@@ -852,14 +872,14 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   }
 
   // Remove outliers (max_angle, residual error)
-  const size_t pointcount_initial = sfm_data_.structure.size();
-  double dThresholdPixel = 3.0; //1.5
+  pointcount_initial = sfm_data_.structure.size();
+  dThresholdPixel = 3.0; //1.5
   RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel); //4.0rm
-  const size_t pointcount_pixelresidual_filter = sfm_data_.structure.size();
-  double dMinAcceptedAngle = 1.0; //0.5
+  pointcount_pixelresidual_filter = sfm_data_.structure.size();
+  dMinAcceptedAngle = 1.0; //0.5, in degree
   RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle); //2.0, reconstruction fails with 1.5
 //  std::cout << "3, 2.0" << std::endl;
-  const size_t pointcount_angular_filter = sfm_data_.structure.size();
+  pointcount_angular_filter = sfm_data_.structure.size();
   std::cout << "Outlier removal (remaining #points):\n"
     << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
     << "\t Threshold Pixel: " << dThresholdPixel << "\n"

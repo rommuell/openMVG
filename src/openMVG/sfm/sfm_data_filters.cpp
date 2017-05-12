@@ -44,6 +44,7 @@ IndexT RemoveOutliers_PixelResidualError
 )
 {
   IndexT outlier_count = 0;
+  IndexT outlier_count_okvis = 0;
   Landmarks::iterator iterTracks = sfm_data.structure.begin();
   while (iterTracks != sfm_data.structure.end())
   {
@@ -55,19 +56,30 @@ IndexT RemoveOutliers_PixelResidualError
       const geometry::Pose3 pose = sfm_data.GetPoseOrDie(view);
       const cameras::IntrinsicBase * intrinsic = sfm_data.intrinsics.at(view->id_intrinsic).get();
       const Vec2 residual = intrinsic->residual(pose, iterTracks->second.X, itObs->second.x);
-      if (residual.norm() > dThresholdPixel && !iterTracks->second.b_external) // do not delete external (okvis) observations
+      if (residual.norm() > dThresholdPixel)
       {
-        ++outlier_count;
-        itObs = obs.erase(itObs);
+        if (!iterTracks->second.b_external){ // do not delete external (okvis) observations
+            ++outlier_count;
+            itObs = obs.erase(itObs);
+        } else {
+          outlier_count_okvis++;
+          ++outlier_count;
+          itObs = obs.erase(itObs);
+        }
       }
       else
         ++itObs;
     }
-    if ((obs.empty() || obs.size() < minTrackLength) && !iterTracks->second.b_external)
-      iterTracks = sfm_data.structure.erase(iterTracks);
+    if (obs.empty() || obs.size() < minTrackLength)
+      if (!iterTracks->second.b_external){
+        iterTracks = sfm_data.structure.erase(iterTracks);
+      } else {
+         std::cout << "too short okvis track would have been deleted (px)" << std::endl;
+      }
     else
       ++iterTracks;
   }
+  std::cout << outlier_count_okvis << " okvis observations have been deleted (px)" << std::endl;
   return outlier_count;
 }
 
@@ -80,6 +92,7 @@ IndexT RemoveOutliers_AngleError
 )
 {
   IndexT removedTrack_count = 0;
+  IndexT removedTrack_count_okvis = 0;
   Landmarks::iterator iterTracks = sfm_data.structure.begin();
   while (iterTracks != sfm_data.structure.end())
   {
@@ -100,20 +113,28 @@ IndexT RemoveOutliers_AngleError
         const geometry::Pose3 pose2 = sfm_data.GetPoseOrDie(view2);
         const cameras::IntrinsicBase * intrinsic2 = sfm_data.intrinsics.at(view2->id_intrinsic).get();
 
+        //angle in degree
         const double angle = AngleBetweenRay(
           pose1, intrinsic1, pose2, intrinsic2,
           itObs1->second.x, itObs2->second.x);
         max_angle = std::max(angle, max_angle);
       }
     }
-    if (max_angle < dMinAcceptedAngle && !iterTracks->second.b_external)
+    if (max_angle < dMinAcceptedAngle)
     {
-      iterTracks = sfm_data.structure.erase(iterTracks);
-      ++removedTrack_count;
+      if (!iterTracks->second.b_external){
+        iterTracks = sfm_data.structure.erase(iterTracks);
+        ++removedTrack_count;
+      } else {
+        removedTrack_count_okvis++;
+        iterTracks = sfm_data.structure.erase(iterTracks);
+        ++removedTrack_count;
+      }
     }
     else
       ++iterTracks;
   }
+    std::cout << removedTrack_count_okvis << " okvis track have been deleted (angle)" << std::endl;
   return removedTrack_count;
 }
 
