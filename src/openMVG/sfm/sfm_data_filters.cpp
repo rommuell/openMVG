@@ -75,12 +75,50 @@ IndexT RemoveOutliers_PixelResidualError
         iterTracks = sfm_data.structure.erase(iterTracks);
       } else {
          std::cout << "too short okvis track would have been deleted (px)" << std::endl;
+         ++iterTracks;
       }
     else
       ++iterTracks;
   }
   std::cout << outlier_count_okvis << " okvis observations have been deleted (px)" << std::endl;
   return outlier_count;
+}
+
+double Stats_PixelResidualError
+(
+  SfM_Data & sfm_data
+)
+{
+
+  std::vector<float> residuals;
+  residuals.reserve(sfm_data.structure.size() * 5);
+  Landmarks::iterator iterTracks = sfm_data.structure.begin();
+  while (iterTracks != sfm_data.structure.end())
+  {
+    Observations & obs = iterTracks->second.obs;
+    Observations::iterator itObs = obs.begin();
+    while (itObs != obs.end())
+    {
+      const View * view = sfm_data.views.at(itObs->first).get();
+      const geometry::Pose3 pose = sfm_data.GetPoseOrDie(view);
+      const cameras::IntrinsicBase * intrinsic = sfm_data.intrinsics.at(view->id_intrinsic).get();
+      const Vec2 residual = intrinsic->residual(pose, iterTracks->second.X, itObs->second.x);
+      residuals.push_back(residual.norm());
+      itObs++;
+    }
+      ++iterTracks;
+  }
+  sort(residuals.begin(), residuals.end());
+
+  for (auto it = residuals.begin(); it != residuals.end(); it++){
+      std::cout << *it << std::endl;
+  }
+
+  double thresh = 0.5;
+  int m = thresh * residuals.size();
+  std::cout << residuals.size() << "# residuals" << std::endl;
+  std::cout << sfm_data.structure.size() * 5 << "# residuals guessed" << std::endl;
+  return residuals[m];
 }
 
 // Remove tracks that have a small angle (tracks with tiny angle leads to instable 3D points)
@@ -136,6 +174,56 @@ IndexT RemoveOutliers_AngleError
   }
     std::cout << removedTrack_count_okvis << " okvis track have been deleted (angle)" << std::endl;
   return removedTrack_count;
+}
+
+double Stats_AngleError
+(
+  SfM_Data & sfm_data
+)
+{
+  std::vector<float> residuals;
+  residuals.reserve(sfm_data.structure.size() * 5);
+  Landmarks::iterator iterTracks = sfm_data.structure.begin();
+  while (iterTracks != sfm_data.structure.end())
+  {
+    Observations & obs = iterTracks->second.obs;
+    double max_angle = 0.0;
+    for (Observations::const_iterator itObs1 = obs.begin();
+      itObs1 != obs.end(); ++itObs1)
+    {
+      const View * view1 = sfm_data.views.at(itObs1->first).get();
+      const geometry::Pose3 pose1 = sfm_data.GetPoseOrDie(view1);
+      const cameras::IntrinsicBase * intrinsic1 = sfm_data.intrinsics.at(view1->id_intrinsic).get();
+
+      Observations::const_iterator itObs2 = itObs1;
+      ++itObs2;
+      for (; itObs2 != obs.end(); ++itObs2)
+      {
+        const View * view2 = sfm_data.views.at(itObs2->first).get();
+        const geometry::Pose3 pose2 = sfm_data.GetPoseOrDie(view2);
+        const cameras::IntrinsicBase * intrinsic2 = sfm_data.intrinsics.at(view2->id_intrinsic).get();
+
+        //angle in degree
+        const double angle = AngleBetweenRay(
+          pose1, intrinsic1, pose2, intrinsic2,
+          itObs1->second.x, itObs2->second.x);
+        max_angle = std::max(angle, max_angle);
+      }
+      residuals.push_back(max_angle);
+    }
+      ++iterTracks;
+  }
+  sort(residuals.begin(), residuals.end());
+
+    for (auto it = residuals.begin(); it != residuals.end(); it++){
+        std::cout << *it << std::endl;
+    }
+
+  double thresh = 0.5;
+  int m = thresh * residuals.size();
+  std::cout << residuals.size() << "# residuals" << std::endl;
+  std::cout << sfm_data.structure.size() * 5 << "# residuals guessed" << std::endl;
+  return residuals[m];
 }
 
 bool eraseMissingPoses
