@@ -469,15 +469,51 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 //    return false;
 //  }
 
+// non-max-supp-filter
+  int before = sfm_data_.structure.size();
+  map<double, IndexT> ratio_map;
+  for (auto it_lm = sfm_data_.structure.begin(); it_lm != sfm_data_.structure.end(); it_lm++){
+      double mean_ratio = 0.0;
+      int cpt = 0;
+      for (auto it_obs = it_lm->second.obs.begin(); it_obs != it_lm->second.obs.end(); it_obs++){
+          if (it_obs->second.ratio != 0.0){
+              mean_ratio += it_obs->second.ratio;
+              cpt++;
+          }
+      }
+      mean_ratio = mean_ratio / cpt;
+      ratio_map.emplace(mean_ratio, it_lm->first);
+  }
+
+  auto it1 = ratio_map.begin();
+  while ( it1 != ratio_map.end()){
+    Eigen::Vector3d X1 = sfm_data_.structure.at(it1->second).X;
+    double dist = (sfm_data_.poses.at(sfm_data_.structure.at(it1->second).obs.begin()->first).center() -X1).norm();
+    bool b_del = false;
+    for (auto it2 = ratio_map.begin(); it2 != it1; it2++){
+      Eigen::Vector3d X2 = sfm_data_.structure.at(it2->second).X;
+      if ((X1 - X2).norm() / dist < 0.04){ //(0.06: ~3.5°if rectangular, 6% of distance if parallel)
+        b_del = true;
+        break;
+      }
+    }
+    if (b_del){
+      sfm_data_.structure.erase(it1->second);
+      it1 = ratio_map.erase(it1);
+    } else {
+      it1++;
+    }
+  }
+  cout << "# lm deleted by nms " << before - sfm_data_.structure.size() << " of " << before << endl;
 
 
   // merge
   sfm_data_.structure.insert(structure_okvis_bkp.begin(), structure_okvis_bkp.end());
 //  sfm_data_.structure = structure_okvis_bkp; // uncomment this line for only okvis structure
 
+
   //filter out lm only connected to fixed poses (needed for new landmarks)
   // same code as OpenMVG::FilterFixFix()
-
   auto it = sfm_data_.structure.begin();
   do{
       bool b_has_flex_pose = false;
@@ -719,7 +755,14 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
         const size_t imaIndex = it->first;
         const size_t featIndex = it->second;
         const PointFeature & pt = features_provider_->feats_per_view.at(imaIndex)[featIndex];
-        double ratio = ratio_provider.at(imaIndex)[featIndex];
+        auto it_img = ratio_provider.find(imaIndex);
+        double ratio = 0.0;
+        if (it_img != ratio_provider.end()){
+            auto it_feat = it_img->second.find(featIndex);
+            if (it_feat != it_img->second.end()){
+                ratio = it_feat->second;
+            }
+        }
         obs[imaIndex] = Observation(pt.coords().cast<double>(), featIndex, ratio);
       }
     }

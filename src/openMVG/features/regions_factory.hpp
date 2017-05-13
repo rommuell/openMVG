@@ -15,8 +15,9 @@ namespace features {
 
 /// Define the classic SIFT Keypoint
 using SIFT_Regions = Scalar_Regions<SIOPointFeature,unsigned char,128>;
-
-/// Define the AKAZE Keypoint (with a float descriptor)
+/// Define the SURF Keypoint (with a float descriptor)
+//using SURF_Regions = Scalar_Regions<SIOPointFeature,float,64>;
+///// Define the AKAZE Keypoint (with a float descriptor)
 using AKAZE_Float_Regions = Scalar_Regions<SIOPointFeature,float,64>;
 /// Define the AKAZE Keypoint (with a LIOP descriptor)
 using AKAZE_Liop_Regions = Scalar_Regions<SIOPointFeature,unsigned char,144>;
@@ -34,6 +35,8 @@ using AKAZE_Binary_Regions = Binary_Regions<SIOPointFeature,64>;
 #include <cereal/archives/json.hpp>
 CEREAL_REGISTER_TYPE_WITH_NAME(openMVG::features::SIFT_Regions, "SIFT_Regions");
 CEREAL_REGISTER_POLYMORPHIC_RELATION(openMVG::features::Regions, openMVG::features::SIFT_Regions)
+//CEREAL_REGISTER_TYPE_WITH_NAME(openMVG::features::SURF_Regions, "SURF_Regions");
+//CEREAL_REGISTER_POLYMORPHIC_RELATION(openMVG::features::Regions, openMVG::features::SURF_Regions)
 CEREAL_REGISTER_TYPE_WITH_NAME(openMVG::features::AKAZE_Float_Regions, "AKAZE_Float_Regions");
 CEREAL_REGISTER_POLYMORPHIC_RELATION(openMVG::features::Regions, openMVG::features::AKAZE_Float_Regions)
 CEREAL_REGISTER_TYPE_WITH_NAME(openMVG::features::AKAZE_Liop_Regions, "AKAZE_Liop_Regions");
