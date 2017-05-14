@@ -811,51 +811,51 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   // Refine sfm_scene (in a 3 iteration process (free the parameters regarding their incertainty order)):
   Bundle_Adjustment_Ceres bundle_adjustment_obj;
   // - refine only Structure and translations
-  bool b_BA_Status = bundle_adjustment_obj.Adjust
-    (
-      sfm_data_,
-      Optimize_Options(
-        Intrinsic_Parameter_Type::NONE, // Intrinsics are held as constant
-        Extrinsic_Parameter_Type::ADJUST_TRANSLATION, // Rotations are held as constant
-        Structure_Parameter_Type::ADJUST_ALL,
-        Control_Point_Parameter(),
-        this->b_use_motion_prior_)
-    );
-  if (b_BA_Status)
-  {
-    if (!sLogging_file_.empty())
-    {
-      Save(sfm_data_,
-        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_00_refine_T_Xi", "ply"),
-        ESfM_Data(EXTRINSICS | STRUCTURE));
+//  bool b_BA_Status = bundle_adjustment_obj.Adjust
+//    (
+//      sfm_data_,
+//      Optimize_Options(
+//        Intrinsic_Parameter_Type::NONE, // Intrinsics are held as constant
+//        Extrinsic_Parameter_Type::ADJUST_TRANSLATION, // Rotations are held as constant
+//        Structure_Parameter_Type::ADJUST_ALL,
+//        Control_Point_Parameter(),
+//        this->b_use_motion_prior_)
+//    );
+//  if (b_BA_Status)
+//  {
+//    if (!sLogging_file_.empty())
+//    {
+//      Save(sfm_data_,
+//        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_00_refine_T_Xi", "ply"),
+//        ESfM_Data(EXTRINSICS | STRUCTURE));
 
-      std::cout << "...Generating intermediate SfM_Report.html" << std::endl;
-      Generate_SfM_Report(sfm_data_,
-        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "SfMReconstruction_Report_after_T_Xi.html"));
-    }
+//      std::cout << "...Generating intermediate SfM_Report.html" << std::endl;
+//      Generate_SfM_Report(sfm_data_,
+//        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "SfMReconstruction_Report_after_T_Xi.html"));
+//    }
 
-    // - refine only Structure and Rotations & translations
-    b_BA_Status = bundle_adjustment_obj.Adjust
-      (
-        sfm_data_,
-        Optimize_Options(
-          Intrinsic_Parameter_Type::NONE, // Intrinsics are held as constant
-          Extrinsic_Parameter_Type::ADJUST_ALL,
-          Structure_Parameter_Type::ADJUST_ALL,
-          Control_Point_Parameter(),
-          this->b_use_motion_prior_)
-      );
-    if (b_BA_Status && !sLogging_file_.empty())
-    {
-      Save(sfm_data_,
-        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_01_refine_RT_Xi", "ply"),
-        ESfM_Data(EXTRINSICS | STRUCTURE));
-    }
-  }
-
-  if (b_BA_Status && ReconstructionEngine::intrinsic_refinement_options_ != Intrinsic_Parameter_Type::NONE) {
+//    // - refine only Structure and Rotations & translations
+//    b_BA_Status = bundle_adjustment_obj.Adjust
+//      (
+//        sfm_data_,
+//        Optimize_Options(
+//          Intrinsic_Parameter_Type::NONE, // Intrinsics are held as constant
+//          Extrinsic_Parameter_Type::ADJUST_ALL,
+//          Structure_Parameter_Type::ADJUST_ALL,
+//          Control_Point_Parameter(),
+//          this->b_use_motion_prior_)
+//      );
+//    if (b_BA_Status && !sLogging_file_.empty())
+//    {
+//      Save(sfm_data_,
+//        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_01_refine_RT_Xi", "ply"),
+//        ESfM_Data(EXTRINSICS | STRUCTURE));
+//    }
+//  }
+//    bool b_BA_Status = true;
+//  if (b_BA_Status && ReconstructionEngine::intrinsic_refinement_options_ != Intrinsic_Parameter_Type::NONE) {
     // - refine all: Structure, motion:{rotations, translations} and optics:{intrinsics}
-    b_BA_Status = bundle_adjustment_obj.Adjust
+    bool b_BA_Status = bundle_adjustment_obj.Adjust
       (
         sfm_data_,
         Optimize_Options(
@@ -871,7 +871,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
         stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_02_refine_KRT_Xi", "ply"),
         ESfM_Data(EXTRINSICS | STRUCTURE));
     }
-  }
+//  }
 
   median_factor = 3.5;
   dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;

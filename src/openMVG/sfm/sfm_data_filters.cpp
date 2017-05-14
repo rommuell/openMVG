@@ -65,6 +65,7 @@ IndexT RemoveOutliers_PixelResidualError
           outlier_count_okvis++;
           ++outlier_count;
           itObs = obs.erase(itObs);
+//          itObs++;
         }
       }
       else
@@ -166,6 +167,7 @@ IndexT RemoveOutliers_AngleError
       } else {
         removedTrack_count_okvis++;
         iterTracks = sfm_data.structure.erase(iterTracks);
+//        iterTracks++;
         ++removedTrack_count;
       }
     }
