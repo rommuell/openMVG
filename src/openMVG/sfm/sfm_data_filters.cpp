@@ -58,30 +58,31 @@ IndexT RemoveOutliers_PixelResidualError
       const Vec2 residual = intrinsic->residual(pose, iterTracks->second.X, itObs->second.x);
       if (residual.norm() > dThresholdPixel)
       {
-        if (!iterTracks->second.b_external){ // do not delete external (okvis) observations
+        if (!iterTracks->second.b_external){ // do (not) delete external (okvis) observations
             ++outlier_count;
             itObs = obs.erase(itObs);
         } else {
           outlier_count_okvis++;
           ++outlier_count;
-          itObs = obs.erase(itObs);
-//          itObs++;
+//          itObs = obs.erase(itObs);
+          itObs++;
         }
       }
       else
         ++itObs;
     }
+//    std::cout << "mintracklength " << minTrackLength << std::endl;
     if (obs.empty() || obs.size() < minTrackLength)
-      if (!iterTracks->second.b_external){
+//      if (!iterTracks->second.b_external){
         iterTracks = sfm_data.structure.erase(iterTracks);
-      } else {
-         std::cout << "too short okvis track would have been deleted (px)" << std::endl;
-         ++iterTracks;
-      }
+//      } else {
+//         std::cout << "too short okvis track would have been deleted (px)" << std::endl;
+//         ++iterTracks;
+//      }
     else
       ++iterTracks;
   }
-  std::cout << outlier_count_okvis << " okvis observations have been deleted (px)" << std::endl;
+  std::cout << outlier_count_okvis << " okvis observations (would) have been deleted (px)" << std::endl;
   return outlier_count;
 }
 
@@ -111,9 +112,9 @@ double Stats_PixelResidualError
   }
   sort(residuals.begin(), residuals.end());
 
-  for (auto it = residuals.begin(); it != residuals.end(); it++){
-      std::cout << *it << std::endl;
-  }
+//  for (auto it = residuals.begin(); it != residuals.end(); it++){
+//      std::cout << *it << std::endl;
+//  }
 
   double thresh = 0.5;
   int m = thresh * residuals.size();
@@ -166,15 +167,15 @@ IndexT RemoveOutliers_AngleError
         ++removedTrack_count;
       } else {
         removedTrack_count_okvis++;
-        iterTracks = sfm_data.structure.erase(iterTracks);
-//        iterTracks++;
+//        iterTracks = sfm_data.structure.erase(iterTracks);
+        iterTracks++;
         ++removedTrack_count;
       }
     }
     else
       ++iterTracks;
   }
-    std::cout << removedTrack_count_okvis << " okvis track have been deleted (angle)" << std::endl;
+    std::cout << removedTrack_count_okvis << " okvis tracks (would) have been deleted (angle)" << std::endl;
   return removedTrack_count;
 }
 
@@ -217,9 +218,9 @@ double Stats_AngleError
   }
   sort(residuals.begin(), residuals.end());
 
-    for (auto it = residuals.begin(); it != residuals.end(); it++){
-        std::cout << *it << std::endl;
-    }
+//    for (auto it = residuals.begin(); it != residuals.end(); it++){
+//        std::cout << *it << std::endl;
+//    }
 
   double thresh = 0.5;
   int m = thresh * residuals.size();

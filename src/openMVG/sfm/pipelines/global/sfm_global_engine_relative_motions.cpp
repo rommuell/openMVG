@@ -472,7 +472,15 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 
 
   // merge
-  sfm_data_.structure.insert(structure_okvis_bkp.begin(), structure_okvis_bkp.end());
+  // make sure not to overwrite landmarks with same id
+  for (auto it_lm = structure_okvis_bkp.begin(); it_lm != structure_okvis_bkp.end(); it_lm++){
+      int i = 0;
+      while ( sfm_data_.structure.find(it_lm->first + i) != sfm_data_.structure.end() ){
+          i++;
+      }
+      sfm_data_.structure.emplace(it_lm->first + i, it_lm->second);
+    }
+
 //  sfm_data_.structure = structure_okvis_bkp; // uncomment this line for only okvis structure
 
   //filter out lm only connected to fixed poses (needed for new landmarks)
@@ -755,12 +763,12 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
     std::cout << std::endl << "  Triangulation took (s): " << timer.elapsed() << std::endl;
 
     // Export initial structure
-    if (!sLogging_file_.empty())
-    {
-      Save(sfm_data_,
-        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "initial_structure", "ply"),
-        ESfM_Data(EXTRINSICS | STRUCTURE));
-    }
+//    if (!sLogging_file_.empty())
+//    {
+//      Save(sfm_data_,
+//        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "initial_structure", "ply"),
+//        ESfM_Data(EXTRINSICS | STRUCTURE));
+//    }
   }
   return !sfm_data_.structure.empty();
 }
@@ -791,12 +799,18 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 
   double median_factor = 3.5;
   dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
+  if (dThresholdPixel > 4.0){
+      dThresholdPixel = 4.0;
+    }
   // filter on input data
   // Remove outliers (max_angle, residual error)
   pointcount_initial = sfm_data_.structure.size();
   RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
   pointcount_pixelresidual_filter = sfm_data_.structure.size();
   dMinAcceptedAngle = Stats_AngleError(sfm_data_) / median_factor;
+  if (dMinAcceptedAngle < 2.0){
+      dMinAcceptedAngle = 2.0; //set lower bound
+    }
   RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle);
 //  std::cout << "3, 2.0" << std::endl;
   pointcount_angular_filter = sfm_data_.structure.size();
@@ -807,6 +821,13 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
     << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
     << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
     << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
+
+  if (!sLogging_file_.empty())
+  {
+    Save(sfm_data_,
+      stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "input_raw_filtered", "ply"),
+      ESfM_Data(EXTRINSICS | STRUCTURE));
+  }
 
   // Refine sfm_scene (in a 3 iteration process (free the parameters regarding their incertainty order)):
   Bundle_Adjustment_Ceres bundle_adjustment_obj;
@@ -868,12 +889,12 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
     if (b_BA_Status && !sLogging_file_.empty())
     {
       Save(sfm_data_,
-        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_02_refine_KRT_Xi", "ply"),
+        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_01", "ply"),
         ESfM_Data(EXTRINSICS | STRUCTURE));
     }
 //  }
 
-  median_factor = 3.5;
+  median_factor = 5.5;
   dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
   // filter on input data
   // Remove outliers (max_angle, residual error)
@@ -895,7 +916,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   if (!sLogging_file_.empty())
   {
     Save(sfm_data_,
-      stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_03_outlier_removed", "ply"),
+      stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_01_outlier_removed", "ply"),
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
