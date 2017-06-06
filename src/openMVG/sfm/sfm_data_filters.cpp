@@ -72,7 +72,8 @@ IndexT RemoveOutliers_PixelResidualError
         ++itObs;
     }
 //    std::cout << "mintracklength " << minTrackLength << std::endl;
-    if (obs.empty() || obs.size() < minTrackLength)
+//    if (obs.empty() || obs.size() < minTrackLength)
+    if (obs.empty() || obs.size() < 2 || iterTracks->second.X.norm() > 400)
 //      if (!iterTracks->second.b_external){
         iterTracks = sfm_data.structure.erase(iterTracks);
 //      } else {
