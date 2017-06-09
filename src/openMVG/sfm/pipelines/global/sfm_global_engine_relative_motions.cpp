@@ -177,7 +177,6 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
 
   if (true){ //disable (false) initial structure computation in case no openMVG are added (see also openMVG.cpp 805)
     if (!Compute_Initial_Structure(matches_provider_->pairWise_matches_))
-//    if (!Compute_Initial_Structure(tripletWise_matches))
     {
       std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
       return false;
