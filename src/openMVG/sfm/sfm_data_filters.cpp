@@ -36,6 +36,7 @@ std::set<IndexT> Get_Valid_Views
 
 // Remove tracks that have a small angle (tracks with tiny angle leads to instable 3D points)
 // Return the number of removed tracks
+// no filtering applied to OKVIS landmarks, only openMVG
 IndexT RemoveOutliers_PixelResidualError
 (
   SfM_Data & sfm_data,
@@ -58,12 +59,14 @@ IndexT RemoveOutliers_PixelResidualError
       const Vec2 residual = intrinsic->residual(pose, iterTracks->second.X, itObs->second.x);
       if (residual.norm() > dThresholdPixel)
       {
-        if (!iterTracks->second.b_external){ // do (not) delete external (okvis) observations
+        if (!iterTracks->second.b_external){ // do not delete external (OKVIS) observations
             ++outlier_count;
             itObs = obs.erase(itObs);
         } else {
           outlier_count_okvis++;
           ++outlier_count;
+
+          // toggle comment next two line to apply OKVIS filtering as well
 //          itObs = obs.erase(itObs);
           itObs++;
         }
@@ -71,22 +74,18 @@ IndexT RemoveOutliers_PixelResidualError
       else
         ++itObs;
     }
-//    std::cout << "mintracklength " << minTrackLength << std::endl;
-//    if (obs.empty() || obs.size() < minTrackLength)
+
+    // filter landmark if only observend from one image or if landmark very far away (visualization problems)
     if (obs.empty() || obs.size() < 2 || iterTracks->second.X.norm() > 400)
-//      if (!iterTracks->second.b_external){
         iterTracks = sfm_data.structure.erase(iterTracks);
-//      } else {
-//         std::cout << "too short okvis track would have been deleted (px)" << std::endl;
-//         ++iterTracks;
-//      }
     else
       ++iterTracks;
   }
-  std::cout << outlier_count_okvis << " okvis observations (would) have been deleted (px)" << std::endl;
+  std::cout << outlier_count_okvis << " okvis observations would have been deleted (px)" << std::endl;
   return outlier_count;
 }
 
+// calculation of median of reprojection errors
 double Stats_PixelResidualError
 (
   SfM_Data & sfm_data
@@ -113,19 +112,20 @@ double Stats_PixelResidualError
   }
   sort(residuals.begin(), residuals.end());
 
+// print sorted residuals
 //  for (auto it = residuals.begin(); it != residuals.end(); it++){
 //      std::cout << *it << std::endl;
 //  }
 
+  // read median
   double thresh = 0.5;
   int m = thresh * residuals.size();
-  std::cout << residuals.size() << "# residuals" << std::endl;
-  std::cout << sfm_data.structure.size() * 5 << "# residuals guessed" << std::endl;
   return residuals[m];
 }
 
 // Remove tracks that have a small angle (tracks with tiny angle leads to instable 3D points)
 // Return the number of removed tracks
+// the naming of this function is wrong! no error is considered, only parallax!
 IndexT RemoveOutliers_AngleError
 (
   SfM_Data & sfm_data,
@@ -163,24 +163,28 @@ IndexT RemoveOutliers_AngleError
     }
     if (max_angle < dMinAcceptedAngle)
     {
-      if (!iterTracks->second.b_external){
+      if (!iterTracks->second.b_external){ // do not delete external (OKVIS) observations
         iterTracks = sfm_data.structure.erase(iterTracks);
         ++removedTrack_count;
       } else {
         removedTrack_count_okvis++;
+
+       // toggle comment next two line to apply OKVIS filtering as well
 //        iterTracks = sfm_data.structure.erase(iterTracks);
         iterTracks++;
+
         ++removedTrack_count;
       }
     }
     else
       ++iterTracks;
   }
-    std::cout << removedTrack_count_okvis << " okvis tracks (would) have been deleted (angle)" << std::endl;
+    std::cout << removedTrack_count_okvis << " okvis tracks would have been deleted (angle)" << std::endl;
   return removedTrack_count;
 }
 
-double Stats_AngleError
+double Stats_Angle
+// calculates median of meaximum parallax per landmark
 (
   SfM_Data & sfm_data
 )
@@ -219,14 +223,14 @@ double Stats_AngleError
   }
   sort(residuals.begin(), residuals.end());
 
+//  print sorted max. parallax
 //    for (auto it = residuals.begin(); it != residuals.end(); it++){
 //        std::cout << *it << std::endl;
 //    }
 
+  // read median
   double thresh = 0.5;
   int m = thresh * residuals.size();
-  std::cout << residuals.size() << "# residuals" << std::endl;
-  std::cout << sfm_data.structure.size() * 5 << "# residuals guessed" << std::endl;
   return residuals[m];
 }
 

@@ -91,10 +91,6 @@ void GlobalSfMReconstructionEngine_RelativeMotions::SetTranslationAveragingMetho
 
 bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
 
-  //rm
-//  sfm_data_.structure. clear();
-//  sfm_data_.poses.clear();
-
   //-------------------
   // Keep only the largest biedge connected subgraph
   //-------------------
@@ -126,7 +122,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
     return false;
   }
 
-//  //rm
+// egm export tripletwise matches
 //  ofstream TwmFile(sfm_data_.s_root_path + "/tripletWiseMatches.txt");
 //  for (auto it = tripletWise_matches.begin(); it != tripletWise_matches.end(); it++){
 //      TwmFile << it->first.first << " " << it->first.second << std::endl;
@@ -171,7 +167,10 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process() {
 }
 
 bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
+  // global recoonstruction process
+  // merges OKVIS data with openMVG pipeline
 
+  // save OKVIS structure data which is already in sfm_data_
   auto structure_okvis_bkp = sfm_data_.structure;
   sfm_data_.structure.clear();
 
@@ -183,7 +182,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
     }
   }
 
-  // merge
+  // merge OKVIS and openMVG structure
   // make sure not to overwrite landmarks with same id
   for (auto it_lm = structure_okvis_bkp.begin(); it_lm != structure_okvis_bkp.end(); it_lm++){
       int i = 0;
@@ -193,30 +192,36 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
       sfm_data_.structure.emplace(it_lm->first + i, it_lm->second);
     }
 
-  //sfm_data_.structure = structure_okvis_bkp; // uncomment this line for only okvis structure (features/initial structure will still be calculated)
+  // uncomment this line for only okvis structure (features/initial structure will still be calculated)
+  // sfm_data_.structure = structure_okvis_bkp;
 
   //filter out lm only connected to fixed poses (needed for new landmarks)
   // same code as OpenMVG::FilterFixFix()
-
   auto it = sfm_data_.structure.begin();
   do{
-      bool b_has_flex_pose = false;
+      bool b_has_flex_pose = false; // true if lm is observed from a flexible pose
+
       for (auto itO = it->second.obs.begin(); itO != it->second.obs.end(); itO++){
+          bool b_fix = false; // pose is fix (true) or not
+
           const sfm::ViewPriors * view_pose_prior = dynamic_cast<sfm::ViewPriors*>(sfm_data_.views.at(itO->first).get());
-          bool b_fix = false;
-          if (view_pose_prior != nullptr){
+
+          if (view_pose_prior != nullptr){ // can only be fixed if view_pose_prior found
               b_fix = view_pose_prior->b_fix_pose_;
             }
+
           b_has_flex_pose |= !b_fix;
         }
-      if (b_has_flex_pose){
+
+      if (b_has_flex_pose){ // if observed from flex pose
           it++;
       } else {
           it = sfm_data_.structure.erase(it);
         }
+
     } while (it != sfm_data_.structure.end());
 
-
+  // Bundle Adjustment, filtering
   if (!Adjust())
   {
     std::cerr << "GlobalSfM:: Non-linear adjustment failure!" << std::endl;
@@ -410,7 +415,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Compute_Initial_Structure
     // Use triplet validated matches
     tracksBuilder.Build(tripletWise_matches);
 #endif
-    tracksBuilder.Filter(3); //Filter(3);
+    tracksBuilder.Filter(3);
     STLMAPTracks map_selectedTracks; // reconstructed track (visibility per 3D point)
     tracksBuilder.ExportToSTL(map_selectedTracks);
 
@@ -502,6 +507,8 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
+  // /////////////////////////////////////////////////////////////////////////////////////
+  // input filtering
 
   size_t pointcount_initial = 0;
   double dThresholdPixel = 0;
@@ -509,23 +516,31 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   double dMinAcceptedAngle = 0;
   size_t pointcount_angular_filter = 0;
 
-  double median_factor = 3.5;
+  // reprojection error
+  double median_factor = 3.5; // observations with bigger error than median_factor * median are erased
   dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
+
+  // upper limit for dThresholdPixel set at openMVG default
   if (dThresholdPixel > 4.0){
       dThresholdPixel = 4.0;
     }
-  // filter on input data
-  // Remove outliers (max_angle, residual error)
+
   pointcount_initial = sfm_data_.structure.size();
   RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
   pointcount_pixelresidual_filter = sfm_data_.structure.size();
-  dMinAcceptedAngle = Stats_AngleError(sfm_data_) / median_factor;
+
+  // filtering landmark with small observation parallax
+  // observations with smaller parallax than median / median_factor are erased
+  dMinAcceptedAngle = Stats_Angle(sfm_data_) / median_factor;
+
+  // lower limit for dMinAcceptedAngle set at openMVG default
   if (dMinAcceptedAngle < 2.0){
       dMinAcceptedAngle = 2.0; //set lower bound
     }
   RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle);
-//  std::cout << "3, 2.0" << std::endl;
   pointcount_angular_filter = sfm_data_.structure.size();
+
+  // print filter statistics
   std::cout << "input outlier removal (remaining #points):\n"
     << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
     << "\t median_factor: "  <<  median_factor << "\n"
@@ -534,6 +549,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
     << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
     << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
 
+  // export filtered scene
   if (!sLogging_file_.empty())
   {
     Save(sfm_data_,
@@ -541,81 +557,38 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
-  // Refine sfm_scene (in a 3 iteration process (free the parameters regarding their incertainty order)):
+  // Refine sfm_scene
   Bundle_Adjustment_Ceres bundle_adjustment_obj;
-  // - refine only Structure and translations
-//  bool b_BA_Status = bundle_adjustment_obj.Adjust
-//    (
-//      sfm_data_,
-//      Optimize_Options(
-//        Intrinsic_Parameter_Type::NONE, // Intrinsics are held as constant
-//        Extrinsic_Parameter_Type::ADJUST_TRANSLATION, // Rotations are held as constant
-//        Structure_Parameter_Type::ADJUST_ALL,
-//        Control_Point_Parameter(),
-//        this->b_use_motion_prior_)
-//    );
-//  if (b_BA_Status)
-//  {
-//    if (!sLogging_file_.empty())
-//    {
-//      Save(sfm_data_,
-//        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_00_refine_T_Xi", "ply"),
-//        ESfM_Data(EXTRINSICS | STRUCTURE));
 
-//      std::cout << "...Generating intermediate SfM_Report.html" << std::endl;
-//      Generate_SfM_Report(sfm_data_,
-//        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "SfMReconstruction_Report_after_T_Xi.html"));
-//    }
+  // only adjust translation
+  bool b_BA_Status = bundle_adjustment_obj.Adjust
+    (
+      sfm_data_,
+      Optimize_Options(
+        ReconstructionEngine::intrinsic_refinement_options_,
+        Extrinsic_Parameter_Type::ADJUST_TRANSLATION,
+        Structure_Parameter_Type::ADJUST_ALL,
+        Control_Point_Parameter(),
+        this->b_use_motion_prior_)
+    );
 
-//    // - refine only Structure and Rotations & translations
-//    b_BA_Status = bundle_adjustment_obj.Adjust
-//      (
-//        sfm_data_,
-//        Optimize_Options(
-//          Intrinsic_Parameter_Type::NONE, // Intrinsics are held as constant
-//          Extrinsic_Parameter_Type::ADJUST_ALL,
-//          Structure_Parameter_Type::ADJUST_ALL,
-//          Control_Point_Parameter(),
-//          this->b_use_motion_prior_)
-//      );
-//    if (b_BA_Status && !sLogging_file_.empty())
-//    {
-//      Save(sfm_data_,
-//        stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_01_refine_RT_Xi", "ply"),
-//        ESfM_Data(EXTRINSICS | STRUCTURE));
-//    }
-//  }
-//    bool b_BA_Status = true;
-//  if (b_BA_Status && ReconstructionEngine::intrinsic_refinement_options_ != Intrinsic_Parameter_Type::NONE) {
-    // - refine all: Structure, motion:{rotations, translations} and optics:{intrinsics}
-    bool b_BA_Status = bundle_adjustment_obj.Adjust
-      (
-        sfm_data_,
-        Optimize_Options(
-          ReconstructionEngine::intrinsic_refinement_options_,
-          Extrinsic_Parameter_Type::ADJUST_TRANSLATION,
-          Structure_Parameter_Type::ADJUST_ALL,
-          Control_Point_Parameter(),
-          this->b_use_motion_prior_)
-      );
-    if (b_BA_Status && !sLogging_file_.empty())
+  // save scene
+  if (b_BA_Status && !sLogging_file_.empty())
     {
       Save(sfm_data_,
         stlplus::create_filespec(stlplus::folder_part(sLogging_file_), "structure_01", "ply"),
         ESfM_Data(EXTRINSICS | STRUCTURE));
     }
-//  }
 
+  // second filtering step only on reprojection error with increased meadin_factor
   median_factor = 5.5;
   dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
-  // filter on input data
-  // Remove outliers (max_angle, residual error)
+
   pointcount_initial = sfm_data_.structure.size();
   RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
   pointcount_pixelresidual_filter = sfm_data_.structure.size();
-//  dMinAcceptedAngle = Stats_AngleError(sfm_data_) / median_factor;
-//  RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle);
-//  std::cout << "3, 2.0" << std::endl;
+
+  //print filter statistics
   pointcount_angular_filter = sfm_data_.structure.size();
   std::cout << "input outlier removal (remaining #points):\n"
     << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
@@ -625,6 +598,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
     << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
     << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
 
+  // save scene after 2nd filtering
   if (!sLogging_file_.empty())
   {
     Save(sfm_data_,
@@ -632,24 +606,7 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
       ESfM_Data(EXTRINSICS | STRUCTURE));
   }
 
-//  do not remove any poses, do not remove any landmarks (with less than two observations)
-//  because a lot of okvis traks have just a length of 2
-    //  // Check that poses & intrinsic cover some measures (after outlier removal)
-    //  const IndexT minPointPerPose = 6; // 6 min,was 12
-    //  const IndexT minTrackLength = 2; // 2 min, was 3
-    //  if (eraseUnstablePosesAndObservations(sfm_data_, minPointPerPose, minTrackLength))
-    //  {
-    //    // TODO: must ensure that track graph is producing a single connected component
-
-    //    const size_t pointcount_cleaning = sfm_data_.structure.size();
-    //    std::cout << "Point_cloud cleaning:\n"
-    //      << "\t #3DPoints: " << pointcount_cleaning << "\n";
-    //  }
-
-  // --
-  // Final BA. We refine one more time,
-  // since some outlier have been removed and so a better solution can be found.
-  //--
+  // second BA only translation
   const Optimize_Options ba_refine_options(
     ReconstructionEngine::intrinsic_refinement_options_,
     Extrinsic_Parameter_Type::ADJUST_TRANSLATION,  // adjust camera motion
@@ -660,6 +617,10 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   b_BA_Status = bundle_adjustment_obj.Adjust(sfm_data_, ba_refine_options);
 
 
+// /////////////////////////////////////////////////////////////////////////////////////
+// comment here for rotation lock
+
+  // Final BA, adjust all
   const Optimize_Options ba_refine_options2(
     ReconstructionEngine::intrinsic_refinement_options_,
     Extrinsic_Parameter_Type::ADJUST_ALL,  // adjust camera motion
@@ -669,7 +630,10 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 
   b_BA_Status = bundle_adjustment_obj.Adjust(sfm_data_, ba_refine_options2);
 
+// end of comment here for rotation lock
+// /////////////////////////////////////////////////////////////////////////////////////
 
+  // save scene after final BA
   if (b_BA_Status && !sLogging_file_.empty())
   {
     Save(sfm_data_,

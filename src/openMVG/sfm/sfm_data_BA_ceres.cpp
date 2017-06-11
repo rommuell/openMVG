@@ -102,7 +102,7 @@ Bundle_Adjustment_Ceres::BA_Ceres_options::BA_Ceres_options
 )
 : bVerbose_(bVerbose),
   nb_threads_(1),
-  parameter_tolerance_(1e-8), //~= numeric_limits<float>::epsilon() //tested, no influence on termination criterion of ceres
+  parameter_tolerance_(1e-8), //~= numeric_limits<float>::epsilon()
   bUse_loss_function_(true)
 {
   #ifdef OPENMVG_USE_OPENMP
@@ -111,7 +111,7 @@ Bundle_Adjustment_Ceres::BA_Ceres_options::BA_Ceres_options
   if (!bmultithreaded)
     nb_threads_ = 1;
 
-  bCeres_summary_ = true;//false;rm
+  bCeres_summary_ = true; // print optimization summary
 
   // Default configuration use a DENSE representation
   linear_solver_type_ = ceres::DENSE_SCHUR;
@@ -233,48 +233,18 @@ bool Bundle_Adjustment_Ceres::Adjust
   Hash_Map<IndexT, std::vector<double> > map_poses;
 
   // Setup Poses data & subparametrization
+  // fix poses in first overlap
   for (const auto & pose_it : sfm_data.poses)
   {
     const IndexT indexPose = pose_it.first;
 
-//      const sfm::ViewPriors * prior = dynamic_cast<sfm::ViewPriors*>(view_it.second.get());
     const sfm::ViewPriors * view_pose_prior = dynamic_cast<sfm::ViewPriors*>(sfm_data.views.at(indexPose).get());
     bool b_fix_pose = false;
+
+    // fix pose if prior is available and _fix_pose is set
     if (view_pose_prior != nullptr){ //in case a prior was provided
-        b_fix_pose = view_pose_prior->b_fix_pose_; // && view_pose_prior != nullptr && sfm_data.IsPoseAndIntrinsicDefined(view_pose_prior);
-      } //else {
-//        std::cout << "nullptr" << std::endl;
-//      }
-
-//    std::cout << "idPose: " << indexPose /*<< " idView/pose: " << view_pose_prior->id_view << "," << view_pose_prior->id_pose*/
-//         << " b_fix_pose: " << b_fix_pose << std::endl;
-
-    // not necessary step as poses already set in importOkvisData
-//    Mat3 R, R2;
-//    Vec3 t, t2;
-//    if (b_fix_pose){ //use data saved in prior
-//        R = view_pose_prior->pose_rotation_;
-//        t = -( R * view_pose_prior->pose_center_ );
-
-//        // for debugging
-//        const Pose3 & pose = pose_it.second;
-//        R2 = pose.rotation();
-//        t2 = pose.translation();
-
-//        {
-//          using namespace std;
-//          cout << "R" << endl << R << endl << endl << "R2" << endl << R2 << endl << endl;
-//          cout << "t" << endl << t << endl << endl << "t2" << endl << t2 << endl;
-//          cout << endl;
-//        }
-//      } else {
-//        // use data calculated in steps before (rel Rot, glob Rot, transl.)
-//        // in case data poses are given, it is overwritten by identical data
-//        // TODO: check and improve
-//        const Pose3 & pose = pose_it.second;
-//        R = pose.rotation();
-//        t = pose.translation();
-//      }
+        b_fix_pose = view_pose_prior->b_fix_pose_;
+      }
 
     const Pose3 & pose = pose_it.second;
     Mat3 R = pose.rotation();
@@ -282,12 +252,12 @@ bool Bundle_Adjustment_Ceres::Adjust
 
     double angleAxis[3];
     ceres::RotationMatrixToAngleAxis((const double*)R.data(), angleAxis);
+
     // angleAxis + translation
     map_poses[indexPose] = {angleAxis[0], angleAxis[1], angleAxis[2], t(0), t(1), t(2)};
 
     double * parameter_block = &map_poses[indexPose][0];
     problem.AddParameterBlock(parameter_block, 6);
-
 
     //fix pose here
     if ((options.extrinsics_opt == Extrinsic_Parameter_Type::NONE) || b_fix_pose)
@@ -372,6 +342,8 @@ bool Bundle_Adjustment_Ceres::Adjust
     const Observations & obs = structure_landmark_it.second.obs;
 
     double weight = 0.0;
+
+//    // apply different weight for OKVIS and openMVG features here
 //    if (structure_landmark_it.second.b_external){
 //        weight = 1.0;
 //      } else {
@@ -464,20 +436,16 @@ bool Bundle_Adjustment_Ceres::Adjust
   // Configure a BA engine and run it
   //  Make Ceres automatically detect the bundle structure.
   ceres::Solver::Options ceres_config_options;
-  ceres_config_options.max_num_iterations = 500; //500rm
+  ceres_config_options.max_num_iterations = 500;
   ceres_config_options.preconditioner_type = ceres_options_.preconditioner_type_;
   ceres_config_options.linear_solver_type = ceres_options_.linear_solver_type_;
   ceres_config_options.sparse_linear_algebra_library_type = ceres_options_.sparse_linear_algebra_library_type_;
   ceres_config_options.minimizer_progress_to_stdout = ceres_options_.bVerbose_;
   ceres_config_options.logging_type = ceres::SILENT;
   ceres_config_options.num_threads = ceres_options_.nb_threads_;
-//  std::cout << "nb_threads " << ceres_options_.nb_threads_ << std::endl;
   ceres_config_options.num_linear_solver_threads = ceres_options_.nb_threads_;
   ceres_config_options.parameter_tolerance = ceres_options_.parameter_tolerance_;
-//  //rm
-//  ceres_config_options.parameter_tolerance = 1e-10;
-  ceres_config_options.function_tolerance = 1e-10; //|cost_change|/cost
-//  //end rm
+  ceres_config_options.function_tolerance = 1e-10; // |cost_change|/cost
 
   // Solve BA
   ceres::Solver::Summary summary;

@@ -77,7 +77,7 @@ inline bool Save_PLY(
       {
         for (const auto & view : sfm_data.GetViews())
         {
-          // Export pose priors as Blue points and fixed poses as red points
+          // Export pose priors as blue points and fixed poses as red points
           std::string position = "";
           if (const sfm::ViewPriors *prior = dynamic_cast<sfm::ViewPriors*>(view.second.get()))
           {
@@ -95,7 +95,7 @@ inline bool Save_PLY(
             }
           }
 
-          // Export pose as Green points
+          // Export pose as green points
           if (sfm_data.IsPoseAndIntrinsicDefined(view.second.get()))
           {
             const geometry::Pose3 pose = sfm_data.GetPoseOrDie(view.second.get());

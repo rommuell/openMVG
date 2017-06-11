@@ -63,7 +63,7 @@ IndexT RemoveOutliers_AngleError
   const double dMinAcceptedAngle
 );
 
-double Stats_AngleError
+double Stats_Angle
 (
   SfM_Data & sfm_data
 );

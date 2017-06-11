@@ -15,7 +15,6 @@
 
 #include "third_party/htmlDoc/htmlDoc.hpp"
 
-//rm
 #include "openMVG/tracks/tracks.hpp"
 
 

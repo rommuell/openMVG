@@ -50,6 +50,9 @@ struct Landmark
 {
   Vec3 X;
   Observations obs;
+
+  // flag for origin of landmark
+  // true for external (OKVIS), false for internal (openMVG)
   bool b_external = false;
 
   // Serialization

@@ -43,32 +43,11 @@ struct ViewPriors : public View
     ),
     b_use_pose_center_(false),
     b_use_pose_rotation_(false),
-    b_fix_pose_(false)
+    b_fix_pose_(false) // flag for fixing pose (not just priored but fixed)
   {
   }
 
   ~ViewPriors() override = default;
-
-//  void SetPoseCenterPrior
-//  (
-//    const Vec3 & center,
-//    const Vec3 & weight
-//  )
-//  {
-//    b_use_pose_center_  = true;
-//    center_weight_      = weight;
-//    pose_center_        = center;
-//  }
-
-//  void SetPoseRotationPrior
-//  (
-//    const Mat3 & rotation,
-//    const double weight
-//  )
-//  {
-//    rotation_weight_ = weight;
-//    pose_rotation_   = rotation;
-//  }
 
   /**
   * Serialization out
