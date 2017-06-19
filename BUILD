@@ -71,6 +71,14 @@ If you want enable unit tests and examples to the build:
 If you want have an IDE openable project with codeblocks:
  $ cmake -G "CodeBlocks - Unix Makefiles" -DCMAKE_BUILD_TYPE=RELEASE . ../openMVG/src/
 
+
+For use in egm, set cmake options:
+
+	cmake -DCMAKE_BUILD_TYPE=Release -DEIGEN_INCLUDE_DIR_HINTS:PATH=/usr/include -DEIGEN_DIR:PATH=/usr/include/eigen3 -DCERES_DIR_HINTS:PATH=/home/rm/code/ceres-solver_Install/share/Ceres -DOpenMVG_BUILD_SHARED:BOOL=TRUE -DCMAKE_INSTALL_PREFIX:PATH=/home/rm/code/openMVG_Install -DOpenMVG_USE_OPENMP:BOOL=TRUE . ../openMVG/src/
+
+	in /home/rm/openMVG/src/third_party/ceres-solver/CMakeLists.txt
+line 72 turn minilog off
+
 Compile the project
  $ make
 

@@ -174,7 +174,8 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
   auto structure_okvis_bkp = sfm_data_.structure;
   sfm_data_.structure.clear();
 
-  if (true){ //disable (false) initial structure computation in case no openMVG are added (see also openMVG.cpp 805)
+  bool no_add_feat = false;
+  if (!no_add_feat){ //disable (false) initial structure computation in case no openMVG are added (see also openMVG.cpp 546)
     if (!Compute_Initial_Structure(matches_provider_->pairWise_matches_))
     {
       std::cerr << "GlobalSfM:: Cannot initialize an initial structure!" << std::endl;
@@ -191,9 +192,6 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Process_okvis() {
       }
       sfm_data_.structure.emplace(it_lm->first + i, it_lm->second);
     }
-
-  // uncomment this line for only okvis structure (features/initial structure will still be calculated)
-  // sfm_data_.structure = structure_okvis_bkp;
 
   //filter out lm only connected to fixed poses (needed for new landmarks)
   // same code as OpenMVG::FilterFixFix()
@@ -515,39 +513,43 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   size_t pointcount_pixelresidual_filter = 0;
   double dMinAcceptedAngle = 0;
   size_t pointcount_angular_filter = 0;
+  double median_factor = 0;
+  bool use_egm_filtering = true; // flag whether to use egm filtering (true) or openMVG standard filtering (false)
 
-  // reprojection error
-  double median_factor = 3.5; // observations with bigger error than median_factor * median are erased
-  dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
+  if (use_egm_filtering) {
+    // reprojection error
+    median_factor = 3.5; // observations with bigger error than median_factor * median are erased
+    dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
 
-  // upper limit for dThresholdPixel set at openMVG default
-  if (dThresholdPixel > 4.0){
-      dThresholdPixel = 4.0;
+    // upper limit for dThresholdPixel set at openMVG default
+    if (dThresholdPixel > 4.0){
+        dThresholdPixel = 4.0;
+      }
+
+    pointcount_initial = sfm_data_.structure.size();
+    RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
+    pointcount_pixelresidual_filter = sfm_data_.structure.size();
+
+    // filtering landmark with small observation parallax
+    // observations with smaller parallax than median / median_factor are erased
+    dMinAcceptedAngle = Stats_Angle(sfm_data_) / median_factor;
+
+    // lower limit for dMinAcceptedAngle set at openMVG default
+    if (dMinAcceptedAngle < 2.0){
+        dMinAcceptedAngle = 2.0; //set lower bound
+      }
+    RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle);
+    pointcount_angular_filter = sfm_data_.structure.size();
+
+    // print filter statistics
+    std::cout << "input outlier removal (remaining #points):\n"
+      << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
+      << "\t median_factor: "  <<  median_factor << "\n"
+      << "\t Threshold Pixel: " << dThresholdPixel << "\n"
+      << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
+      << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
+      << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
     }
-
-  pointcount_initial = sfm_data_.structure.size();
-  RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
-  pointcount_pixelresidual_filter = sfm_data_.structure.size();
-
-  // filtering landmark with small observation parallax
-  // observations with smaller parallax than median / median_factor are erased
-  dMinAcceptedAngle = Stats_Angle(sfm_data_) / median_factor;
-
-  // lower limit for dMinAcceptedAngle set at openMVG default
-  if (dMinAcceptedAngle < 2.0){
-      dMinAcceptedAngle = 2.0; //set lower bound
-    }
-  RemoveOutliers_AngleError(sfm_data_, dMinAcceptedAngle);
-  pointcount_angular_filter = sfm_data_.structure.size();
-
-  // print filter statistics
-  std::cout << "input outlier removal (remaining #points):\n"
-    << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
-    << "\t median_factor: "  <<  median_factor << "\n"
-    << "\t Threshold Pixel: " << dThresholdPixel << "\n"
-    << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
-    << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
-    << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
 
   // export filtered scene
   if (!sLogging_file_.empty())
@@ -580,23 +582,44 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
         ESfM_Data(EXTRINSICS | STRUCTURE));
     }
 
-  // second filtering step only on reprojection error with increased meadin_factor
-  median_factor = 5.5;
-  dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
+  if (use_egm_filtering) {
+    // second filtering step only on reprojection error with increased meadin_factor
+    median_factor = 5.5;
+    dThresholdPixel = Stats_PixelResidualError(sfm_data_) * median_factor;
 
-  pointcount_initial = sfm_data_.structure.size();
-  RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
-  pointcount_pixelresidual_filter = sfm_data_.structure.size();
+    pointcount_initial = sfm_data_.structure.size();
 
-  //print filter statistics
-  pointcount_angular_filter = sfm_data_.structure.size();
-  std::cout << "input outlier removal (remaining #points):\n"
-    << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
-    << "\t median_factor: "  <<  median_factor << "\n"
-    << "\t Threshold Pixel: " << dThresholdPixel << "\n"
-    << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
-    << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
-    << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
+    RemoveOutliers_PixelResidualError(sfm_data_, dThresholdPixel);
+    pointcount_pixelresidual_filter = sfm_data_.structure.size();
+
+    //print filter statistics
+    pointcount_angular_filter = sfm_data_.structure.size();
+    std::cout << "input outlier removal (remaining #points):\n"
+      << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
+      << "\t median_factor: "  <<  median_factor << "\n"
+      << "\t Threshold Pixel: " << dThresholdPixel << "\n"
+      << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
+      << "\t Threshold Angle: " << dMinAcceptedAngle << "\n"
+      << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
+
+  } else {
+    // standard openMVG filtering
+
+    pointcount_initial = sfm_data_.structure.size();
+    RemoveOutliers_PixelResidualError(sfm_data_, 4.0);
+    pointcount_pixelresidual_filter = sfm_data_.structure.size();
+    RemoveOutliers_AngleError(sfm_data_, 2.0);
+    pointcount_angular_filter = sfm_data_.structure.size();
+
+    //print filter statistics
+    pointcount_angular_filter = sfm_data_.structure.size();
+    std::cout << "input outlier removal (remaining #points):\n"
+      << "\t initial structure size #3DPoints: " << pointcount_initial << "\n"
+      << "\t Threshold Pixel: " << 4.0 << "\n"
+      << "\t\t pixel residual filter  #3DPoints: " << pointcount_pixelresidual_filter << "\n"
+      << "\t Threshold Angle: " << 2.0 << "\n"
+      << "\t\t angular filter         #3DPoints: " << pointcount_angular_filter << std::endl;
+  }
 
   // save scene after 2nd filtering
   if (!sLogging_file_.empty())
@@ -616,22 +639,18 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
 
   b_BA_Status = bundle_adjustment_obj.Adjust(sfm_data_, ba_refine_options);
 
+  bool adjust_all = true;
+  if (adjust_all) {
+    // Final BA, adjust all
+    const Optimize_Options ba_refine_options2(
+      ReconstructionEngine::intrinsic_refinement_options_,
+      Extrinsic_Parameter_Type::ADJUST_ALL,  // adjust camera motion
+      Structure_Parameter_Type::ADJUST_ALL,  // adjust scene structure
+      Control_Point_Parameter(),
+      this->b_use_motion_prior_);
 
-// /////////////////////////////////////////////////////////////////////////////////////
-// comment here for rotation lock
-
-  // Final BA, adjust all
-  const Optimize_Options ba_refine_options2(
-    ReconstructionEngine::intrinsic_refinement_options_,
-    Extrinsic_Parameter_Type::ADJUST_ALL,  // adjust camera motion
-    Structure_Parameter_Type::ADJUST_ALL,  // adjust scene structure
-    Control_Point_Parameter(),
-    this->b_use_motion_prior_);
-
-  b_BA_Status = bundle_adjustment_obj.Adjust(sfm_data_, ba_refine_options2);
-
-// end of comment here for rotation lock
-// /////////////////////////////////////////////////////////////////////////////////////
+    b_BA_Status = bundle_adjustment_obj.Adjust(sfm_data_, ba_refine_options2);
+  }
 
   // save scene after final BA
   if (b_BA_Status && !sLogging_file_.empty())
