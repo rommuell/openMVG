@@ -632,8 +632,8 @@ bool GlobalSfMReconstructionEngine_RelativeMotions::Adjust()
   // second BA only translation
   const Optimize_Options ba_refine_options(
     ReconstructionEngine::intrinsic_refinement_options_,
-    Extrinsic_Parameter_Type::ADJUST_TRANSLATION,  // adjust camera motion
-    Structure_Parameter_Type::ADJUST_ALL,  // adjust scene structure
+    Extrinsic_Parameter_Type::ADJUST_TRANSLATION,  // Extrinsic_Parameter_Type::ADJUST_ALL
+    Structure_Parameter_Type::ADJUST_ALL,
     Control_Point_Parameter(),
     this->b_use_motion_prior_);
 
